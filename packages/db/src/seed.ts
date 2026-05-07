@@ -1,6 +1,6 @@
-import { prisma } from './index.js';
-import { italianCurriculumSeed } from './seeds/italian-curriculum.js';
-import { promptTemplateSeed } from './seeds/prompt-templates.js';
+import { prisma } from './index';
+import { italianCurriculumSeed } from './seeds/italian-curriculum';
+import { promptTemplateSeed } from './seeds/prompt-templates';
 
 async function main() {
   console.log('▶ Seeding curriculum…');

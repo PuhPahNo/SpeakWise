@@ -21,8 +21,26 @@ body {
   body { @apply bg-ink-900 text-ink-50; }
 }
 
-/* Prevent iOS auto-zoom when focusing inputs (font-size must be ≥16px) */
-input, textarea, select { font-size: 16px; }
+/* Form fields: explicitly white bg + dark text so dark-mode browsers
+   don't inherit white text on white inputs. The whole app is light-themed
+   for now; we can introduce true dark mode later. */
+input, textarea, select {
+  font-size: 16px;            /* ≥16px to prevent iOS auto-zoom on focus */
+  background-color: #ffffff;
+  color: theme('colors.ink.900');
+  -webkit-text-fill-color: theme('colors.ink.900'); /* iOS Safari override */
+  caret-color: theme('colors.ink.900');
+}
+input::placeholder, textarea::placeholder {
+  color: theme('colors.ink.400');
+  opacity: 1;
+}
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: theme('colors.ink.900');
+  -webkit-box-shadow: 0 0 0 30px white inset;
+}
 @media (min-width: 640px) {
   input, textarea, select { font-size: inherit; }
 }

@@ -1,6 +1,6 @@
 import { prisma, type InputType } from '@speakwise/db';
 import { emitUserEvent } from '@speakwise/events';
-import { evaluateUserResponse } from '../correction/index.js';
+import { evaluateUserResponse } from '../correction';
 
 export interface SubmitResponseInput {
   userId: string;

@@ -2,7 +2,7 @@ import { prisma } from '@speakwise/db';
 import { Models, chatStructured } from '@speakwise/ai';
 import { CorrectionOutputSchema } from '@speakwise/schemas';
 import { emitUserEvent } from '@speakwise/events';
-import { recordSkillEvidence } from '../progress/index.js';
+import { recordSkillEvidence } from '../progress';
 
 export interface EvaluateInput {
   userId: string;

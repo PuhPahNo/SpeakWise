@@ -8,10 +8,10 @@
 //  - usage is reported back so the caller can emit an AICall UserEvent
 
 import type { ZodTypeAny, z } from 'zod';
-import { getOpenAI } from './openai-client.js';
-import { loadPrompt, renderPrompt } from './prompt-loader.js';
-import { AIError, AISchemaValidationError } from './errors.js';
-import { Models } from './models.js';
+import { getOpenAI } from './openai-client';
+import { loadPrompt, renderPrompt } from './prompt-loader';
+import { AIError, AISchemaValidationError } from './errors';
+import { Models } from './models';
 
 export interface ChatStructuredOptions<S extends ZodTypeAny> {
   promptKey: string;

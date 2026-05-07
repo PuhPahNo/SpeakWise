@@ -1,4 +1,4 @@
-import type { Decimal, ISODateTime, UUID } from './primitives.js';
+import type { Decimal, ISODateTime, UUID } from './primitives';
 
 export const INPUT_TYPES = ['voice', 'text', 'multiple_choice', 'selection'] as const;
 export type InputType = (typeof INPUT_TYPES)[number];

@@ -1,4 +1,4 @@
-import type { CEFRLevel, ISODateTime, Language, UUID } from './primitives.js';
+import type { CEFRLevel, ISODateTime, Language, UUID } from './primitives';
 
 export const SKILL_CATEGORIES = [
   'pronunciation',

@@ -1,4 +1,4 @@
-import type { Decimal, ISODateTime, UUID } from './primitives.js';
+import type { Decimal, ISODateTime, UUID } from './primitives';
 
 export const SKILL_STATUSES = [
   'not_started',

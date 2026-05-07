@@ -2,10 +2,10 @@ import { prisma } from '@speakwise/db';
 import { Models, chatStructured } from '@speakwise/ai';
 import { WiseTurnOutputSchema, type WiseMessageRequest } from '@speakwise/schemas';
 import { emitUserEvent } from '@speakwise/events';
-import { getWiseProfileSummary } from '../profile/index.js';
-import { getActiveSkills, getSkillsDueForReview } from '../curriculum/index.js';
-import { listVocabulary } from '../vocabulary/index.js';
-import { applyMemoryCandidates, retrieveRelevantMemories } from '../memory/index.js';
+import { getWiseProfileSummary } from '../profile';
+import { getActiveSkills, getSkillsDueForReview } from '../curriculum';
+import { listVocabulary } from '../vocabulary';
+import { applyMemoryCandidates, retrieveRelevantMemories } from '../memory';
 
 export async function wiseTurn(userId: string, req: WiseMessageRequest) {
   const [profile, activeSkills, dueSkills, dueVocab, memories] = await Promise.all([

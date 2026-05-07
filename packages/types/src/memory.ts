@@ -1,4 +1,4 @@
-import type { Decimal, ISODateTime, UUID } from './primitives.js';
+import type { Decimal, ISODateTime, UUID } from './primitives';
 
 export const MEMORY_TYPES = [
   'preference',

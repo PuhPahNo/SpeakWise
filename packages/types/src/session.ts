@@ -1,4 +1,4 @@
-import type { ISODateTime, UUID } from './primitives.js';
+import type { ISODateTime, UUID } from './primitives';
 
 export const SESSION_TYPES = [
   'onboarding',

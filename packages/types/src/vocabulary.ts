@@ -1,4 +1,4 @@
-import type { Decimal, ISODateTime, UUID } from './primitives.js';
+import type { Decimal, ISODateTime, UUID } from './primitives';
 
 export const VOCAB_STATUSES = ['new', 'learning', 'review', 'mastered', 'archived'] as const;
 export type VocabStatus = (typeof VOCAB_STATUSES)[number];

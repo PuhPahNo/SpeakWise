@@ -1,3 +1,3 @@
-export * from './ai-outputs.js';
-export * from './api.js';
-export * from './env.js';
+export * from './ai-outputs';
+export * from './api';
+export * from './env';

@@ -1,4 +1,4 @@
-import type { ISODateTime, Language, UUID } from './primitives.js';
+import type { ISODateTime, Language, UUID } from './primitives';
 
 export const MEDIA_SOURCE_TYPES = [
   'youtube',

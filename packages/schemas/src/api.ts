@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CEFRLevelEnum, WiseTurnOutputSchema } from './ai-outputs.js';
+import { CEFRLevelEnum, WiseTurnOutputSchema } from './ai-outputs';
 
 export const InputTypeEnum = z.enum(['voice', 'text', 'multiple_choice', 'selection']);
 export const SessionModeEnum = z.enum(['voice', 'text', 'mixed']);

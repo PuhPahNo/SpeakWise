@@ -1,4 +1,4 @@
-import type { CEFRLevel, Decimal, ISODateTime, UUID } from './primitives.js';
+import type { CEFRLevel, Decimal, ISODateTime, UUID } from './primitives';
 
 export const LEARNING_STYLES = [
   'mission',

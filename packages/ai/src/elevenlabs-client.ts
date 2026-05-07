@@ -1,6 +1,6 @@
-import { Models } from './models.js';
-import { resolveVoiceId } from './voices.js';
-import { AIError } from './errors.js';
+import { Models } from './models';
+import { resolveVoiceId } from './voices';
+import { AIError } from './errors';
 
 export type SpeakLanguage = 'it' | 'en';
 

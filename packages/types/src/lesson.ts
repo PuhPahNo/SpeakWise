@@ -1,4 +1,4 @@
-import type { CEFRLevel, ISODateTime, UUID } from './primitives.js';
+import type { CEFRLevel, ISODateTime, UUID } from './primitives';
 
 export const LESSON_TYPES = [
   'daily_mission',

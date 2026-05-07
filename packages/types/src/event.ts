@@ -1,9 +1,9 @@
-import type { ISODateTime, UUID } from './primitives.js';
-import type { CorrectionSeverity, CorrectionType } from './correction.js';
-import type { MemoryType, MemoryVisibility } from './memory.js';
-import type { LessonType } from './lesson.js';
-import type { SkillStatus } from './progress.js';
-import type { CEFRLevel, Language } from './primitives.js';
+import type { ISODateTime, UUID } from './primitives';
+import type { CorrectionSeverity, CorrectionType } from './correction';
+import type { MemoryType, MemoryVisibility } from './memory';
+import type { LessonType } from './lesson';
+import type { SkillStatus } from './progress';
+import type { CEFRLevel, Language } from './primitives';
 
 export const USER_EVENT_TYPES = [
   'OnboardingStarted',

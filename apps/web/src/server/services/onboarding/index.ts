@@ -2,7 +2,7 @@ import { prisma, type SessionMode, type CEFRLevel } from '@speakwise/db';
 import { Models, chatStructured } from '@speakwise/ai';
 import { PlacementAssessmentOutputSchema } from '@speakwise/schemas';
 import { emitUserEvent } from '@speakwise/events';
-import { ensureProfile, updateProfile } from '../profile/index.js';
+import { ensureProfile, updateProfile } from '../profile';
 
 export async function startOnboarding(userId: string, mode: SessionMode) {
   await ensureProfile(userId);

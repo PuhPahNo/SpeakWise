@@ -2,8 +2,8 @@ import { prisma, type LessonType, type LessonAuthor, type CEFRLevel } from '@spe
 import { Models, chatStructured } from '@speakwise/ai';
 import { LessonGenerationOutputSchema } from '@speakwise/schemas';
 import { emitUserEvent } from '@speakwise/events';
-import { getWiseProfileSummary } from '../profile/index.js';
-import { getActiveSkills, getSkillsBySlugs, getSkillsDueForReview } from '../curriculum/index.js';
+import { getWiseProfileSummary } from '../profile';
+import { getActiveSkills, getSkillsBySlugs, getSkillsDueForReview } from '../curriculum';
 
 export interface GenerateLessonInput {
   userId: string;
