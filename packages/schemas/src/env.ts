@@ -18,8 +18,6 @@ export const ServerEnvSchema = z.object({
   OPENAI_MODEL_STT: z.string().default('whisper-1'),
 
   ELEVENLABS_API_KEY: z.string().min(1),
-  ELEVENLABS_VOICE_ID_IT: z.string().min(1),
-  ELEVENLABS_VOICE_ID_EN: z.string().min(1),
   ELEVENLABS_MODEL_ID: z.string().default('eleven_turbo_v2_5'),
 
   SENTRY_DSN: z.string().url().optional(),

@@ -54,3 +54,6 @@ packages/db/prisma/migrations/dev.db*
 # Misc
 .cache/
 *.pem
+
+# Smoke test output
+scripts/.smoke-output.mp3

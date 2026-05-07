@@ -266,6 +266,8 @@ model LearnerProfile {
   preferredSessionLengthMinutes   Int?            @map("preferred_session_length_minutes")
   preferredFrequency              String?         @map("preferred_frequency")
   motivationNotes                 String?         @map("motivation_notes") @db.Text
+  /// ElevenLabs voice ID. Null = use app default (see packages/ai/src/voices.ts).
+  wiseVoiceId                     String?         @map("wise_voice_id")
   onboardingCompleted             Boolean         @default(false) @map("onboarding_completed")
   createdAt                       DateTime        @default(now()) @map("created_at")
   updatedAt                       DateTime        @updatedAt @map("updated_at")

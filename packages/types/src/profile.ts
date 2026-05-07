@@ -43,6 +43,8 @@ export interface LearnerProfile {
   preferredSessionLengthMinutes: number | null;
   preferredFrequency: string | null;
   motivationNotes: string | null;
+  /** ElevenLabs voice ID; null = app default. */
+  wiseVoiceId: string | null;
   onboardingCompleted: boolean;
   createdAt: ISODateTime;
   updatedAt: ISODateTime;

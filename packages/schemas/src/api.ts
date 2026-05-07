@@ -45,6 +45,8 @@ export const PatchProfileRequestSchema = z.object({
   preferredSessionLengthMinutes: z.number().int().min(2).max(120).optional(),
   preferredFrequency: z.string().max(120).optional(),
   motivationNotes: z.string().max(2000).optional(),
+  /** ElevenLabs voice ID — must be one of the curated WISE_VOICES. */
+  wiseVoiceId: z.string().min(8).max(64).optional(),
 });
 
 export const WiseMessageRequestSchema = z.object({

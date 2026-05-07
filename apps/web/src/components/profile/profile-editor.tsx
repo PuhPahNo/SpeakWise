@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { VoicePicker } from './voice-picker';
 
 interface Profile {
   goals: string[];
@@ -9,6 +10,7 @@ interface Profile {
   preferredCorrectionStyle: string;
   preferredSessionLengthMinutes: number | null;
   motivationNotes: string | null;
+  wiseVoiceId: string | null;
 }
 
 export function ProfileEditor({ profile }: { profile: Profile }) {
@@ -18,6 +20,7 @@ export function ProfileEditor({ profile }: { profile: Profile }) {
   const [correctionStyle, setCorrectionStyle] = useState(profile.preferredCorrectionStyle);
   const [duration, setDuration] = useState(profile.preferredSessionLengthMinutes ?? 10);
   const [notes, setNotes] = useState(profile.motivationNotes ?? '');
+  const [voiceId, setVoiceId] = useState<string | null>(profile.wiseVoiceId);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -35,6 +38,7 @@ export function ProfileEditor({ profile }: { profile: Profile }) {
           preferredCorrectionStyle: correctionStyle,
           preferredSessionLengthMinutes: Number(duration),
           motivationNotes: notes,
+          wiseVoiceId: voiceId ?? undefined,
         }),
       });
       setSaved(true);
@@ -101,6 +105,9 @@ export function ProfileEditor({ profile }: { profile: Profile }) {
           className="sw-input"
           rows={3}
         />
+      </Field>
+      <Field label="Wise's voice">
+        <VoicePicker value={voiceId} onChange={setVoiceId} />
       </Field>
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <button
