@@ -4,6 +4,7 @@ import { LessonGenerationOutputSchema } from '@speakwise/schemas';
 import { emitUserEvent } from '@speakwise/events';
 import { getWiseProfileSummary } from '../profile';
 import { getActiveSkills, getSkillsBySlugs, getSkillsDueForReview } from '../curriculum';
+import { listMemory } from '../memory';
 
 export interface GenerateLessonInput {
   userId: string;
@@ -33,6 +34,26 @@ export async function generateLesson(input: GenerateLessonInput) {
 
   const dueSkills = await getSkillsDueForReview(input.userId, 3);
 
+  // Closing the memory loop: feed Wise the skills the learner has been
+  // missing and the most relevant memory notes.
+  const recentMistakeResponses = await prisma.userResponse.findMany({
+    where: { session: { userId: input.userId }, isCorrect: false },
+    orderBy: { createdAt: 'desc' },
+    take: 8,
+    select: { skillIds: true },
+  });
+  const recentMistakeSkillIds = [
+    ...new Set(recentMistakeResponses.flatMap((r) => r.skillIds)),
+  ].slice(0, 5);
+  const recentMistakeSkills = recentMistakeSkillIds.length
+    ? await prisma.curriculumSkill.findMany({
+        where: { id: { in: recentMistakeSkillIds } },
+        select: { slug: true, name: true },
+      })
+    : [];
+
+  const memoryNotes = await listMemory(input.userId);
+
   const context = {
     learner: profile,
     targetSkills: targetSkills.map((s) => ({
@@ -42,6 +63,11 @@ export async function generateLesson(input: GenerateLessonInput) {
       category: s.category,
     })),
     dueForReview: dueSkills.map((d) => ({ slug: d.skill.slug, name: d.skill.name })),
+    recentMistakeSkills: recentMistakeSkills.map((s) => ({ slug: s.slug, name: s.name })),
+    relevantMemory: memoryNotes.slice(0, 6).map((m) => ({
+      type: m.type,
+      content: m.content,
+    })),
   };
 
   const request = {

@@ -15,6 +15,20 @@ interface Options {
    * for the user's reply. This is the Jarvis turn-taking pattern.
    */
   autoListenAfterSpeak?: boolean;
+  /**
+   * If true, recording auto-stops after a sustained silence so the user
+   * doesn't have to tap to end their turn. Defaults to true.
+   */
+  autoStopOnSilence?: boolean;
+  /**
+   * Minimum ms of speech the user must produce before silence-stop arms.
+   * Prevents instant cutoff. Default 600ms.
+   */
+  minSpeechMs?: number;
+  /**
+   * Trailing silence ms after which we auto-stop recording. Default 1500ms.
+   */
+  silenceStopMs?: number;
 }
 
 export interface SpeakOptions {
@@ -48,6 +62,9 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const rafRef = useRef<number | null>(null);
   const playerRef = useRef<HTMLAudioElement | null>(null);
+  // Forward ref so the VAD loop in startListening can call stopAndTranscribe
+  // without a circular dependency in useCallback ordering.
+  const stopAndTranscribeRef = useRef<(() => Promise<void>) | null>(null);
 
   const cleanupRecording = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -82,6 +99,12 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
   }, [cancel]);
 
   // ── Recording / STT ──────────────────────────────────────────────────
+  // VAD knobs
+  const SPEECH_THRESHOLD = 0.06; // RMS that counts as "speaking"
+  const minSpeechMs = opts.minSpeechMs ?? 600;
+  const silenceStopMs = opts.silenceStopMs ?? 1500;
+  const autoStopOnSilence = opts.autoStopOnSilence ?? true;
+
   const startListening = useCallback(async () => {
     if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
       throw new Error('Microphone API not available');
@@ -91,7 +114,6 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
     });
     streamRef.current = stream;
 
-    // Mic amplitude meter for the orb
     const AudioCtx =
       window.AudioContext ||
       (window as unknown as { webkitAudioContext: typeof AudioContext })
@@ -104,6 +126,11 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
     source.connect(analyser);
     analyserRef.current = analyser;
     const data = new Uint8Array(analyser.frequencyBinCount);
+
+    const startedAt = performance.now();
+    let lastSpeechAt = startedAt;
+    let everSpoke = false;
+
     const tick = () => {
       analyser.getByteTimeDomainData(data);
       let sum = 0;
@@ -112,8 +139,28 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
         sum += v * v;
       }
       const rms = Math.sqrt(sum / data.length);
-      // Compress + map to 0..1 for visual sensitivity
       setAmplitude(Math.min(1, rms * 4));
+
+      const now = performance.now();
+      if (rms > SPEECH_THRESHOLD) {
+        lastSpeechAt = now;
+        if (now - startedAt > minSpeechMs) everSpoke = true;
+      }
+
+      // Auto-stop on trailing silence — only after we've heard at least
+      // some real speech, so we don't cut off the moment they tap.
+      if (
+        autoStopOnSilence &&
+        everSpoke &&
+        now - lastSpeechAt > silenceStopMs &&
+        recorderRef.current &&
+        recorderRef.current.state === 'recording'
+      ) {
+        // Fire-and-forget; transcription advances state.
+        void stopAndTranscribeRef.current?.();
+        return;
+      }
+
       rafRef.current = requestAnimationFrame(tick);
     };
     tick();
@@ -135,7 +182,7 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
     recorder.start();
     recorderRef.current = recorder;
     setState('listening');
-  }, []);
+  }, [autoStopOnSilence, minSpeechMs, silenceStopMs]);
 
   const stopAndTranscribe = useCallback(async () => {
     const recorder = recorderRef.current;
@@ -174,6 +221,9 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
       setTimeout(() => setState('idle'), 1500);
     }
   }, [cleanupRecording, opts]);
+
+  // Wire the forward ref so VAD can call into us.
+  stopAndTranscribeRef.current = stopAndTranscribe;
 
   const toggleListen = useCallback(async () => {
     if (state === 'listening') {

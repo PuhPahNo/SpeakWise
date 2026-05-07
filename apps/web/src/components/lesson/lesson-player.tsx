@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sparkles } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { VoiceOrb } from '@/components/voice/voice-orb';
 import { useVoiceTutor } from '@/hooks/use-voice-tutor';
 
@@ -41,6 +42,8 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
   const [pending, setPending] = useState(false);
   const [showText, setShowText] = useState(false);
   const [xpEarned, setXpEarned] = useState<number | null>(null);
+  const [streakDays, setStreakDays] = useState<number | null>(null);
+  const [newMemory, setNewMemory] = useState<Array<{ type: string; content: string }>>([]);
   const briefedRef = useRef(false);
 
   const briefing =
@@ -158,17 +161,26 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
       });
       const data = (await res.json()) as {
         sessionSummary?: { tasksCompleted: number; mistakesDetected: number };
+        xpEarned?: number;
+        streakDays?: number;
+        newMemory?: Array<{ type: string; content: string }>;
       };
-      const correctCount =
-        (data.sessionSummary?.tasksCompleted ?? 0) -
-        (data.sessionSummary?.mistakesDetected ?? 0);
-      // Approximate XP: 50 base + 5 per correct
-      setXpEarned(50 + correctCount * 5);
+      setXpEarned(data.xpEarned ?? 50);
+      setStreakDays(data.streakDays ?? null);
+      setNewMemory(data.newMemory ?? []);
       setPhase('complete');
-      await tutor.speak(
-        `Mission complete. You handled ${data.sessionSummary?.tasksCompleted ?? 0} tasks. Well done.`,
-        { autoListenAfter: false },
-      );
+
+      const tasks = data.sessionSummary?.tasksCompleted ?? 0;
+      const mistakes = data.sessionSummary?.mistakesDetected ?? 0;
+      const headline =
+        mistakes === 0
+          ? `Mission complete. ${tasks} tasks clean — well done.`
+          : `Mission complete. ${tasks} tasks down, a few rough spots to revisit.`;
+      const memoryLine =
+        (data.newMemory ?? []).length > 0
+          ? ` I learned something new about you, too — saving it.`
+          : '';
+      await tutor.speak(headline + memoryLine, { autoListenAfter: false });
     } finally {
       setPending(false);
     }
@@ -227,17 +239,43 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
   // ── Complete ─────────────────────────────────────────────────────────
   if (phase === 'complete') {
     return (
-      <div className="flex flex-col items-center gap-6 sm:gap-8 py-6">
+      <div className="flex flex-col items-center gap-6 sm:gap-8 py-6 animate-fade-up">
         <VoiceOrb state={tutor.state} size="lg" amplitude={tutor.amplitude} />
         <div className="text-center">
           <div className="font-display text-3xl sm:text-4xl text-ink-50">Mission complete</div>
-          {xpEarned !== null && (
-            <div className="mt-3 inline-flex items-center gap-2 text-wise-400">
-              <Sparkles size={18} />
-              <span className="text-lg font-medium">+{xpEarned} XP</span>
-            </div>
-          )}
+          <div className="mt-3 flex items-center justify-center gap-4 text-sm text-ink-200">
+            {xpEarned !== null && (
+              <span className="inline-flex items-center gap-1.5 text-wise-400">
+                <Sparkles size={16} />
+                <span className="font-medium">+{xpEarned} XP</span>
+              </span>
+            )}
+            {streakDays && streakDays > 0 && (
+              <>
+                <span className="opacity-30">·</span>
+                <span className="text-ink-100 font-medium">
+                  {streakDays}-day streak
+                </span>
+              </>
+            )}
+          </div>
         </div>
+
+        {newMemory.length > 0 && (
+          <div className="surface rounded-2xl p-4 sm:p-5 max-w-md w-full">
+            <div className="text-[11px] uppercase tracking-[0.2em] text-wise-400 mb-2">
+              Wise just learned
+            </div>
+            <ul className="space-y-1.5">
+              {newMemory.map((m, i) => (
+                <li key={i} className="text-sm text-ink-100 leading-snug">
+                  · {m.content}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <button
           onClick={() => router.push('/command-center')}
           className="rounded-full bg-wise-500 hover:bg-wise-600 text-ink-900 font-medium px-6 py-3"
@@ -270,18 +308,65 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
         onTap={onOrbTap}
       />
 
-      <div className="text-center max-w-2xl px-2">
-        <p className="font-display text-xl sm:text-2xl text-ink-50 leading-snug animate-fade-up">
-          {currentTask?.prompt}
-        </p>
-      </div>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={`prompt-${currentTask?.id}`}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+          className="text-center max-w-2xl px-2"
+        >
+          {/* Fill-blank: highlight the blank inline */}
+          {currentTask?.taskType === 'fill_blank' ? (
+            <p className="font-display text-xl sm:text-2xl text-ink-50 leading-snug">
+              {currentTask.prompt.split(/(_+)/g).map((seg, i) =>
+                /^_+$/.test(seg) ? (
+                  <span
+                    key={i}
+                    className="inline-block min-w-[2em] mx-1 px-2 border-b-2 border-wise-400 text-wise-400"
+                  >
+                    {' '.repeat(Math.max(seg.length, 4))}
+                  </span>
+                ) : (
+                  <span key={i}>{seg}</span>
+                ),
+              )}
+            </p>
+          ) : currentTask?.taskType === 'listening_comprehension' ? (
+            <div className="space-y-3">
+              <p className="font-display text-xl sm:text-2xl text-ink-50 leading-snug">
+                Listen, then answer.
+              </p>
+              <button
+                type="button"
+                onClick={() => void tutor.speak(currentTask.prompt, { autoListenAfter: false })}
+                className="inline-flex items-center gap-2 rounded-full surface px-5 py-2 text-sm text-ink-50 hover:border-wise-500/40"
+              >
+                ▶ Hear it again
+              </button>
+            </div>
+          ) : (
+            <p className="font-display text-xl sm:text-2xl text-ink-50 leading-snug">
+              {currentTask?.prompt}
+            </p>
+          )}
+        </motion.div>
+      </AnimatePresence>
 
-      {/* Multiple-choice options — primary input for that task type */}
       {phase === 'task' && opts && (
-        <div className="w-full max-w-xl space-y-2">
-          {opts.map((o) => (
-            <button
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+          className="w-full max-w-xl space-y-2"
+        >
+          {opts.map((o, i) => (
+            <motion.button
               key={o.value}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, delay: 0.15 + i * 0.05 }}
               onClick={() => {
                 setAnswer(o.value);
                 void submit(o.value);
@@ -290,9 +375,9 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
               className="block w-full text-left rounded-xl px-4 py-3 surface text-ink-50 hover:border-wise-500/40 active:bg-white/5 transition disabled:opacity-50"
             >
               {o.label}
-            </button>
+            </motion.button>
           ))}
-        </div>
+        </motion.div>
       )}
 
       {/* Voice answer ergonomics + collapsed text fallback */}
@@ -333,33 +418,39 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
         </div>
       )}
 
-      {/* Correction panel */}
-      {phase === 'correction' && correction && (
-        <div
-          className={`w-full max-w-xl rounded-2xl p-4 sm:p-5 border ${
-            correction.isCorrect
-              ? 'bg-sage-500/10 border-sage-500/30 text-ink-50'
-              : 'bg-wise-500/10 border-wise-500/30 text-ink-50'
-          } animate-fade-up`}
-        >
-          <div className="font-medium">
-            {correction.isCorrect ? '✓ Correct' : 'Not quite —'}
-            {correction.encouragement ? ` ${correction.encouragement}` : ''}
-          </div>
-          {!correction.isCorrect && (
-            <div className="mt-1 text-ink-100">
-              Better: <span className="italic">{correction.correctedAnswer}</span>
-            </div>
-          )}
-          <div className="mt-2 text-ink-200 text-sm">{correction.explanation}</div>
-          <button
-            onClick={next}
-            className="mt-4 w-full sm:w-auto rounded-full bg-wise-500 hover:bg-wise-600 text-ink-900 font-medium px-5 py-3"
+      <AnimatePresence>
+        {phase === 'correction' && correction && (
+          <motion.div
+            key="correction"
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className={`w-full max-w-xl rounded-2xl p-4 sm:p-5 border ${
+              correction.isCorrect
+                ? 'bg-sage-500/10 border-sage-500/30 text-ink-50'
+                : 'bg-wise-500/10 border-wise-500/30 text-ink-50'
+            }`}
           >
-            {taskIndex + 1 < tasks.length ? 'Continue →' : 'Finish lesson'}
-          </button>
-        </div>
-      )}
+            <div className="font-medium">
+              {correction.isCorrect ? '✓ Correct' : 'Not quite —'}
+              {correction.encouragement ? ` ${correction.encouragement}` : ''}
+            </div>
+            {!correction.isCorrect && (
+              <div className="mt-1 text-ink-100">
+                Better: <span className="italic">{correction.correctedAnswer}</span>
+              </div>
+            )}
+            <div className="mt-2 text-ink-200 text-sm">{correction.explanation}</div>
+            <button
+              onClick={next}
+              className="mt-4 w-full sm:w-auto rounded-full bg-wise-500 hover:bg-wise-600 text-ink-900 font-medium px-5 py-3"
+            >
+              {taskIndex + 1 < tasks.length ? 'Continue →' : 'Finish lesson'}
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <p className="text-xs text-ink-200">{statusText()}</p>
     </div>

@@ -7,13 +7,14 @@ import { recordSkillEvidence } from '../progress';
 export interface EvaluateInput {
   userId: string;
   userResponseId: string;
+  /** Optional override; defaults to the learner's profile preference. */
   correctionMode?: string;
 }
 
 export async function evaluateUserResponse({
   userId,
   userResponseId,
-  correctionMode = 'adaptive',
+  correctionMode,
 }: EvaluateInput) {
   const ur = await prisma.userResponse.findFirst({
     where: { id: userResponseId, session: { userId } },
@@ -23,6 +24,22 @@ export async function evaluateUserResponse({
 
   const profile = ur.session.user.profile;
   const level = profile?.currentLevel ?? 'beginner';
+  // Honor learner's correction-style preference (Master PRD §correction);
+  // explicit override wins, then profile, then a sensible default.
+  const effectiveMode =
+    correctionMode ?? profile?.preferredCorrectionStyle ?? 'adaptive';
+
+  // Resolve skill names so the prompt can be skill-specific in its
+  // explanation (e.g. "passato prossimo agreement" instead of generic).
+  const skillNames =
+    ur.lessonTask && ur.lessonTask.targetSkillIds.length > 0
+      ? (
+          await prisma.curriculumSkill.findMany({
+            where: { id: { in: ur.lessonTask.targetSkillIds } },
+            select: { name: true, slug: true },
+          })
+        ).map((s) => s.name)
+      : [];
 
   const taskJson = ur.lessonTask
     ? {
@@ -31,8 +48,9 @@ export async function evaluateUserResponse({
         expectedAnswer: ur.lessonTask.expectedAnswer,
         options: ur.lessonTask.options,
         skillIds: ur.lessonTask.targetSkillIds,
+        skillNames,
       }
-    : { taskType: 'freestyle', prompt: '(freestyle)', expectedAnswer: null };
+    : { taskType: 'freestyle', prompt: '(freestyle)', expectedAnswer: null, skillNames: [] };
 
   const result = await chatStructured({
     promptKey: 'correction.evaluate',
@@ -43,7 +61,7 @@ export async function evaluateUserResponse({
     vars: {
       TASK_JSON: JSON.stringify(taskJson),
       ANSWER: ur.userAnswer,
-      CORRECTION_MODE: correctionMode,
+      CORRECTION_MODE: effectiveMode,
       LEVEL: level,
     },
   });

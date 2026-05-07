@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { getOrCreateUser } from '@/lib/auth/current-user';
 import { listVocabulary } from '@/server/services/vocabulary';
 
@@ -12,12 +13,29 @@ export default async function VocabularyPage({
     status: (params.status ?? undefined) as never,
     dueForReview: params.dueForReview === 'true',
   });
+  const dueCount = (await listVocabulary(user.id, { dueForReview: true })).length;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
-      <h1 className="font-display text-2xl sm:text-3xl mb-5 sm:mb-6">Vocabulary</h1>
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-6">
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <h1 className="font-display text-2xl sm:text-3xl text-ink-50">Vocabulary</h1>
+          <p className="text-sm text-ink-200 mt-1">
+            What Wise has put in your bank.
+          </p>
+        </div>
+        {dueCount > 0 && (
+          <Link
+            href="/vocabulary/review"
+            className="rounded-full bg-wise-500 hover:bg-wise-600 text-ink-900 font-medium px-5 py-2.5 text-sm whitespace-nowrap"
+          >
+            Review {dueCount} →
+          </Link>
+        )}
+      </div>
+
       {items.length === 0 ? (
-        <p className="text-ink-600">
+        <p className="text-ink-200 text-sm">
           No words yet. Complete a lesson and Wise will start building your bank.
         </p>
       ) : (
@@ -25,18 +43,18 @@ export default async function VocabularyPage({
           {/* Card list — phones */}
           <ul className="sm:hidden space-y-2">
             {items.map((v) => (
-              <li key={v.id} className="rounded-xl border border-ink-100 bg-white p-3">
+              <li key={v.id} className="rounded-xl px-3 py-3 surface text-ink-50">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="font-medium truncate">{v.targetText}</div>
-                    <div className="text-sm text-ink-600 truncate">{v.nativeText}</div>
+                    <div className="text-sm text-ink-200 truncate">{v.nativeText}</div>
                   </div>
-                  <span className="text-[11px] uppercase tracking-wider text-ink-500 shrink-0">
+                  <span className="text-[10px] uppercase tracking-[0.15em] text-ink-200 shrink-0">
                     {v.status}
                   </span>
                 </div>
                 <div
-                  className="mt-2 h-1.5 bg-ink-100 rounded-full overflow-hidden"
+                  className="mt-2 h-1.5 bg-white/10 rounded-full overflow-hidden"
                   aria-label={`Mastery ${Math.round(Number(v.masteryScore) * 100)} percent`}
                 >
                   <div
@@ -49,7 +67,7 @@ export default async function VocabularyPage({
           </ul>
           {/* Table — tablets and up */}
           <table className="hidden sm:table w-full text-sm">
-            <thead className="text-left text-ink-500 uppercase text-xs">
+            <thead className="text-left text-ink-200 uppercase text-[11px] tracking-[0.15em]">
               <tr>
                 <th className="py-2">Italian</th>
                 <th>English</th>
@@ -59,14 +77,14 @@ export default async function VocabularyPage({
             </thead>
             <tbody>
               {items.map((v) => (
-                <tr key={v.id} className="border-t border-ink-100">
-                  <td className="py-2 font-medium">{v.targetText}</td>
-                  <td>{v.nativeText}</td>
-                  <td className="text-ink-600">{v.status}</td>
+                <tr key={v.id} className="border-t hairline">
+                  <td className="py-2.5 font-medium text-ink-50">{v.targetText}</td>
+                  <td className="text-ink-100">{v.nativeText}</td>
+                  <td className="text-ink-200 capitalize">{v.status.replace(/_/g, ' ')}</td>
                   <td>
-                    <div className="h-1.5 bg-ink-100 rounded-full overflow-hidden w-24">
+                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden w-32">
                       <div
-                        className="h-full bg-wise-500"
+                        className="h-full bg-wise-500 transition-all"
                         style={{ width: `${Number(v.masteryScore) * 100}%` }}
                       />
                     </div>
