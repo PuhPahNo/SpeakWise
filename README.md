@@ -1,0 +1,139 @@
+# Speakwise
+
+Voice-first AI Italian-language tutor. Personal, memory-centric, gamified.
+
+> Status: foundation scaffold. The full PRD package and build plan are in this repo.
+> See [Master PRD.md](./Master%20PRD.md), [Tech Arch & Data.md](./Tech%20Arch%20%26%20Data.md),
+> [14_Build_Execution_Plan.md](./14_Build_Execution_Plan.md), and
+> [docs/ADR-0001-stack.md](./docs/ADR-0001-stack.md).
+
+## Repo layout
+
+```
+apps/
+  web/        Next.js 15 (App Router) — web UI + REST API + cron endpoints
+  mobile/     Expo (SDK 52) — iOS/Android shell, calls the same API
+packages/
+  types/      Canonical TypeScript types for every entity in Tech Arch §6
+  schemas/    Zod runtime validators (AI outputs, API I/O, env)
+  db/         Prisma schema + client + Italian curriculum seed
+  ai/         OpenAI + ElevenLabs clients + prompt loader + chat-structured wrapper
+  events/     UserEvent emitter
+docs/         Architecture decision records
+.github/      CI workflow
+render.yaml   Render Blueprint — Postgres + web service + cron jobs
+.env.example  Every env var the app needs, grouped by category
+```
+
+## Stack
+
+Locked in [`docs/ADR-0001-stack.md`](./docs/ADR-0001-stack.md). Highlights:
+
+- **Web:** Next.js 15 + React 19 + Tailwind + shadcn/ui + Framer Motion + TanStack Query
+- **Mobile:** Expo SDK 52 + expo-router + Clerk Expo + expo-audio
+- **Backend:** Next.js Route Handlers + Server Actions in `apps/web`
+- **DB:** PostgreSQL on Render with `pgvector` for memory embeddings
+- **ORM:** Prisma
+- **Auth:** Clerk
+- **AI:** OpenAI (gpt-4o + gpt-4o-mini, whisper-1, text-embedding-3-small) + ElevenLabs TTS
+- **Hosting:** Render (web service + Postgres + cron jobs)
+
+## Local setup
+
+```bash
+# 1. Install
+corepack enable
+pnpm install
+
+# 2. Postgres with pgvector
+docker run -d --name speakwise-pg -p 5432:5432 \
+  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=speakwise \
+  ankane/pgvector
+
+# 3. Configure env
+cp .env.example .env.local
+# fill in OPENAI_API_KEY, CLERK_*, ELEVENLABS_*
+
+# 4. Migrate + seed
+pnpm --filter @speakwise/db prisma:generate
+pnpm --filter @speakwise/db prisma:migrate:dev
+pnpm --filter @speakwise/db seed
+
+# 5. Run web
+pnpm --filter speakwise-web dev
+# → http://localhost:3000
+
+# 6. (optional) Run mobile
+pnpm --filter speakwise-mobile start
+```
+
+### Required external accounts
+
+You must create these yourself — see `.env.example` for which keys go where:
+
+| Service     | Why                                                    | Where                                               |
+| ----------- | ------------------------------------------------------ | --------------------------------------------------- |
+| Render      | Postgres + web service + cron                          | https://dashboard.render.com                        |
+| Clerk       | Auth (web + mobile)                                    | https://dashboard.clerk.com                         |
+| OpenAI      | LLM, STT (Whisper), embeddings                         | https://platform.openai.com/api-keys                |
+| ElevenLabs  | TTS for Wise (pick Italian + English voices)           | https://elevenlabs.io/app/settings/api-keys         |
+| Sentry      | Errors (optional)                                      | https://sentry.io                                   |
+| PostHog     | Product analytics (optional)                           | https://posthog.com                                 |
+
+## Deploying to Render
+
+1. Push this repo to GitHub.
+2. In Render → New → Blueprint → connect this repo. Render reads `render.yaml`
+   and creates the Postgres database, web service, and cron jobs.
+3. Render will prompt for any env var marked `sync: false` (Clerk keys, OpenAI
+   key, ElevenLabs key, voice IDs, Sentry/PostHog DSNs). Paste them in.
+4. After first deploy, set up a Clerk webhook pointing to
+   `https://<your-render-url>/api/webhooks/clerk` (events: `user.created`,
+   `user.updated`, `user.deleted`) and paste the signing secret into
+   `CLERK_WEBHOOK_SECRET`.
+5. Run the migration once from Render shell:
+   `pnpm --filter @speakwise/db prisma:migrate && pnpm --filter @speakwise/db seed`
+
+## Architecture rules every contributor must follow
+
+These are enforced by the build plan ([14_Build_Execution_Plan.md](./14_Build_Execution_Plan.md))
+and Tech Arch §21:
+
+- Do not duplicate canonical entity definitions. Import from `@speakwise/types`.
+- Do not put prompts in UI components. Add them to `packages/db/src/seeds/prompt-templates.ts`
+  and call them through `chatStructured({ promptKey })`.
+- Do not let UI components mutate learning state directly. Call API routes,
+  which call the service layer in `apps/web/src/server/services/*`.
+- Every AI output that affects product state must be validated against a Zod
+  schema in `@speakwise/schemas` before persistence.
+- Voice-first does not mean voice-only — every flow must have a text fallback.
+- Major user actions must emit a `UserEvent` (see `@speakwise/events`).
+
+## Module map (PRDs ↔ code)
+
+| PRD                             | Code                                                                        |
+| ------------------------------- | --------------------------------------------------------------------------- |
+| 01 Wise AI Tutor                | `apps/web/src/server/services/wise/`                                        |
+| 02 Voice-First Onboarding       | `apps/web/src/server/services/onboarding/` + `app/(app)/onboarding/`        |
+| 03 Learner Memory & Profile     | `apps/web/src/server/services/{profile,memory}/`                            |
+| 04 Curriculum & Skill Graph     | `packages/db/src/seeds/italian-curriculum.ts` + `services/curriculum/`      |
+| 05 Lesson & Mission Engine      | `apps/web/src/server/services/lesson/`                                      |
+| 06 Voice & Chat Interface       | `apps/web/src/app/api/voice/` + `components/lesson/lesson-player.tsx`       |
+| 07 Practice Modes               | `apps/web/src/server/services/practice/`                                    |
+| 08 Correction & Feedback        | `apps/web/src/server/services/correction/`                                  |
+| 09 Gamification & Retention     | `apps/web/src/server/services/gamification/`                                |
+| 10 Media & Clip Learning        | `apps/web/src/server/services/media/` + `app/api/media/`                    |
+| 11 Progress Analytics & Reports | `services/progress/` + `app/api/progress/report/`                           |
+| 12 Tutor Mode                   | (deferred)                                                                  |
+| 13 Admin & Prompt Ops           | `apps/web/src/server/services/admin/` + `app/admin/`                        |
+
+## What's still needed (live punch list)
+
+See [14_Build_Execution_Plan.md](./14_Build_Execution_Plan.md). Critical
+human-only items (see ADR §"Open items deferred"):
+
+- Native Italian linguistic review of seed curriculum and AI-generated lessons
+- Selecting specific ElevenLabs voice IDs for Italian + English
+- Writing the privacy policy / ToS
+- Sourcing rights-cleared media for PRD 10
+- Apple/Google developer accounts for mobile distribution

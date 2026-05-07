@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "Speakwise",
+    "slug": "speakwise",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "scheme": "speakwise",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": { "supportsTablet": true, "bundleIdentifier": "com.speakwise.app" },
+    "android": { "package": "com.speakwise.app", "edgeToEdgeEnabled": true },
+    "web": { "bundler": "metro", "output": "static" },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Speakwise needs microphone access for speaking practice."
+        }
+      ]
+    ]
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "speakwise",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Speakwise — voice-first AI Italian tutor.",
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=20.11.0",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "db:generate": "pnpm --filter @speakwise/db prisma:generate",
+    "db:migrate": "pnpm --filter @speakwise/db prisma:migrate",
+    "db:seed": "pnpm --filter @speakwise/db seed",
+    "clean": "turbo run clean && rm -rf node_modules .turbo"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  }
+}

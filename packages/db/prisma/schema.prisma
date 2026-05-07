@@ -1,0 +1,576 @@
+// Speakwise database schema.
+// All canonical entities from `Tech Arch & Data.md` §6 live here.
+// Field names use snake_case in DB, camelCase in TS via Prisma's @map.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [pgvector(map: "vector")]
+}
+
+// ─── Enums ──────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  learner
+  admin
+  tutor
+  student
+  organization_admin
+}
+
+enum CEFRLevel {
+  complete_beginner
+  beginner
+  lower_intermediate
+  intermediate
+  upper_intermediate
+  advanced
+}
+
+enum LearningStyle {
+  mission
+  tutor
+  conversation
+  drill
+  balanced
+}
+
+enum CorrectionStyle {
+  gentle
+  direct
+  strict
+  end_of_task
+  major_mistakes_only
+  adaptive
+}
+
+enum WisePersonality {
+  default
+  friendly_tutor
+  direct_coach
+  game_master
+  premium_assistant
+  strict_grammar_coach
+  casual_companion
+}
+
+enum SkillCategory {
+  pronunciation
+  vocabulary
+  grammar
+  speaking
+  listening
+  reading
+  writing
+  culture
+  fluency
+}
+
+enum SkillStatus {
+  not_started
+  introduced
+  practicing
+  needs_review
+  proficient
+  mastered
+}
+
+enum VocabStatus {
+  new
+  learning
+  review
+  mastered
+  archived
+}
+
+enum LessonType {
+  daily_mission
+  recovery
+  freestyle
+  grammar
+  vocabulary_review
+  speaking_challenge
+  listening_challenge
+  media
+  scenario_roleplay
+  progress_check
+  placement
+}
+
+enum LessonStatus {
+  draft
+  recommended
+  active
+  completed
+  skipped
+  archived
+}
+
+enum LessonAuthor {
+  wise
+  user
+  admin
+  tutor
+}
+
+enum TaskType {
+  briefing
+  explanation
+  multiple_choice
+  fill_blank
+  translation
+  conjugation
+  pronoun_replacement
+  tense_selection
+  error_correction
+  speaking_prompt
+  listening_comprehension
+  roleplay
+  recap
+  media_clip
+  reflection
+}
+
+enum SessionType {
+  onboarding
+  placement
+  lesson
+  freestyle
+  review
+  conversation
+  media
+  progress_report
+}
+
+enum SessionMode {
+  voice
+  text
+  mixed
+}
+
+enum SessionStatus {
+  active
+  completed
+  abandoned
+  errored
+}
+
+enum InputType {
+  voice
+  text
+  multiple_choice
+  selection
+}
+
+enum CorrectionType {
+  grammar
+  vocabulary
+  pronunciation
+  spelling
+  word_order
+  tone
+  comprehension
+  fluency
+  other
+}
+
+enum CorrectionSeverity {
+  minor
+  moderate
+  major
+}
+
+enum MemoryType {
+  preference
+  goal
+  interest
+  strength
+  weakness
+  recurring_mistake
+  tutor_observation
+  motivation
+  content_preference
+  correction_preference
+  pronunciation_note
+  session_summary
+}
+
+enum MemoryVisibility {
+  user_visible
+  internal
+}
+
+enum MediaSourceType {
+  youtube
+  uploaded
+  licensed
+  ai_generated
+  article
+  transcript
+  other
+}
+
+enum RightsStatus {
+  unknown
+  user_provided
+  public
+  licensed
+  ai_generated
+  restricted
+}
+
+// ─── Models ─────────────────────────────────────────────────────────────────
+
+model User {
+  id              String    @id @default(uuid()) @db.Uuid
+  clerkUserId     String    @unique @map("clerk_user_id")
+  name            String
+  email           String    @unique
+  role            UserRole  @default(learner)
+  nativeLanguage  String    @default("en") @map("native_language")
+  targetLanguage  String    @default("it") @map("target_language")
+  timezone        String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  lastActiveAt    DateTime? @map("last_active_at")
+
+  profile          LearnerProfile?
+  skillProgress    UserSkillProgress[]
+  vocabularyItems  VocabularyItem[]
+  lessons          Lesson[]
+  sessions         Session[]
+  memoryNotes      MemoryNote[]
+  events           UserEvent[]
+  streak           UserStreak?
+  xpLedger         XpEntry[]
+
+  @@map("users")
+}
+
+model LearnerProfile {
+  id                              String          @id @default(uuid()) @db.Uuid
+  userId                          String          @unique @map("user_id") @db.Uuid
+  currentLevel                    CEFRLevel       @default(beginner) @map("current_level")
+  levelConfidence                 Decimal?        @map("level_confidence") @db.Decimal(3, 2)
+  goals                           String[]        @default([])
+  interests                       String[]        @default([])
+  preferredLearningStyle          LearningStyle   @default(balanced) @map("preferred_learning_style")
+  preferredCorrectionStyle        CorrectionStyle @default(adaptive) @map("preferred_correction_style")
+  preferredWisePersonality        WisePersonality @default(default) @map("preferred_wise_personality")
+  preferredSessionLengthMinutes   Int?            @map("preferred_session_length_minutes")
+  preferredFrequency              String?         @map("preferred_frequency")
+  motivationNotes                 String?         @map("motivation_notes") @db.Text
+  onboardingCompleted             Boolean         @default(false) @map("onboarding_completed")
+  createdAt                       DateTime        @default(now()) @map("created_at")
+  updatedAt                       DateTime        @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("learner_profiles")
+}
+
+model CurriculumSkill {
+  id            String        @id @default(uuid()) @db.Uuid
+  language      String        @default("it")
+  name          String
+  slug          String        @unique
+  category      SkillCategory
+  level         CEFRLevel
+  description   String        @db.Text
+  prerequisites String[]      @default([]) @db.Uuid
+  examples      Json          @default("[]")
+  isActive      Boolean       @default(true) @map("is_active")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  userProgress UserSkillProgress[]
+
+  @@index([level])
+  @@index([category])
+  @@map("curriculum_skills")
+}
+
+model UserSkillProgress {
+  id                String       @id @default(uuid()) @db.Uuid
+  userId            String       @map("user_id") @db.Uuid
+  skillId           String       @map("skill_id") @db.Uuid
+  status            SkillStatus  @default(not_started)
+  masteryScore      Decimal      @default(0) @map("mastery_score") @db.Decimal(4, 3)
+  exposureCount     Int          @default(0) @map("exposure_count")
+  correctCount      Int          @default(0) @map("correct_count")
+  incorrectCount    Int          @default(0) @map("incorrect_count")
+  lastPracticedAt   DateTime?    @map("last_practiced_at")
+  nextReviewAt      DateTime?    @map("next_review_at")
+  mistakeCount      Int          @default(0) @map("mistake_count")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill CurriculumSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, skillId])
+  @@index([userId, status])
+  @@index([nextReviewAt])
+  @@map("user_skill_progress")
+}
+
+model VocabularyItem {
+  id                  String      @id @default(uuid()) @db.Uuid
+  userId              String      @map("user_id") @db.Uuid
+  targetText          String      @map("target_text")
+  nativeText          String      @map("native_text")
+  partOfSpeech        String?     @map("part_of_speech")
+  exampleSentence     String?     @map("example_sentence") @db.Text
+  exampleTranslation  String?     @map("example_translation") @db.Text
+  status              VocabStatus @default(new)
+  tags                String[]    @default([])
+  sourceLessonId      String?     @map("source_lesson_id") @db.Uuid
+  sourceSessionId     String?     @map("source_session_id") @db.Uuid
+  masteryScore        Decimal     @default(0) @map("mastery_score") @db.Decimal(4, 3)
+  exposureCount       Int         @default(0) @map("exposure_count")
+  correctCount        Int         @default(0) @map("correct_count")
+  incorrectCount      Int         @default(0) @map("incorrect_count")
+  lastReviewedAt      DateTime?   @map("last_reviewed_at")
+  nextReviewAt        DateTime?   @map("next_review_at")
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, nextReviewAt])
+  @@map("vocabulary_items")
+}
+
+model Lesson {
+  id                       String       @id @default(uuid()) @db.Uuid
+  userId                   String       @map("user_id") @db.Uuid
+  title                    String
+  lessonType               LessonType   @map("lesson_type")
+  status                   LessonStatus @default(draft)
+  targetSkillIds           String[]     @default([]) @map("target_skill_ids") @db.Uuid
+  interestTheme            String?      @map("interest_theme")
+  estimatedDurationMinutes Int?         @map("estimated_duration_minutes")
+  difficultyLevel          CEFRLevel    @default(beginner) @map("difficulty_level")
+  generationContext        Json         @default("{}") @map("generation_context")
+  content                  Json         @default("{}")
+  createdBy                LessonAuthor @default(wise) @map("created_by")
+  createdAt                DateTime     @default(now()) @map("created_at")
+  updatedAt                DateTime     @updatedAt @map("updated_at")
+  completedAt              DateTime?    @map("completed_at")
+
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks    LessonTask[]
+  sessions Session[]
+
+  @@index([userId, status])
+  @@index([userId, lessonType])
+  @@map("lessons")
+}
+
+model LessonTask {
+  id                 String   @id @default(uuid()) @db.Uuid
+  lessonId           String   @map("lesson_id") @db.Uuid
+  taskType           TaskType @map("task_type")
+  orderIndex         Int      @map("order_index")
+  prompt             String   @db.Text
+  targetSkillIds     String[] @default([]) @map("target_skill_ids") @db.Uuid
+  vocabularyItemIds  String[] @default([]) @map("vocabulary_item_ids") @db.Uuid
+  expectedAnswer     Json?    @map("expected_answer")
+  options            Json?
+  metadata           Json     @default("{}")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  lesson    Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  responses UserResponse[]
+
+  @@unique([lessonId, orderIndex])
+  @@map("lesson_tasks")
+}
+
+model Session {
+  id                    String        @id @default(uuid()) @db.Uuid
+  userId                String        @map("user_id") @db.Uuid
+  lessonId              String?       @map("lesson_id") @db.Uuid
+  sessionType           SessionType   @map("session_type")
+  mode                  SessionMode   @default(text)
+  status                SessionStatus @default(active)
+  transcript            Json?
+  summary               String?       @db.Text
+  strengthsObserved     String[]      @default([]) @map("strengths_observed")
+  weaknessesObserved    String[]      @default([]) @map("weaknesses_observed")
+  memoryUpdatesApplied  Boolean       @default(false) @map("memory_updates_applied")
+  startedAt             DateTime      @default(now()) @map("started_at")
+  completedAt           DateTime?     @map("completed_at")
+
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson    Lesson?        @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+  responses UserResponse[]
+
+  @@index([userId, status])
+  @@map("sessions")
+}
+
+model UserResponse {
+  id                 String     @id @default(uuid()) @db.Uuid
+  sessionId          String     @map("session_id") @db.Uuid
+  lessonTaskId       String?    @map("lesson_task_id") @db.Uuid
+  inputType          InputType  @map("input_type")
+  userAnswer         String     @map("user_answer") @db.Text
+  transcription      String?    @db.Text
+  correctedAnswer    String?    @map("corrected_answer") @db.Text
+  isCorrect          Boolean?   @map("is_correct")
+  score              Decimal?   @db.Decimal(4, 3)
+  feedback           String?    @db.Text
+  grammarTags        String[]   @default([]) @map("grammar_tags")
+  vocabularyItemIds  String[]   @default([]) @map("vocabulary_item_ids") @db.Uuid
+  skillIds           String[]   @default([]) @map("skill_ids") @db.Uuid
+  createdAt          DateTime   @default(now()) @map("created_at")
+
+  session     Session      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  lessonTask  LessonTask?  @relation(fields: [lessonTaskId], references: [id], onDelete: SetNull)
+  corrections Correction[]
+
+  @@index([sessionId])
+  @@map("user_responses")
+}
+
+model Correction {
+  id              String             @id @default(uuid()) @db.Uuid
+  userResponseId  String             @map("user_response_id") @db.Uuid
+  correctionType  CorrectionType     @map("correction_type")
+  severity        CorrectionSeverity @default(moderate)
+  originalText    String             @map("original_text") @db.Text
+  correctedText   String             @map("corrected_text") @db.Text
+  explanation     String             @db.Text
+  encouragement   String?            @db.Text
+  retryPrompt     String?            @map("retry_prompt") @db.Text
+  skillIds        String[]           @default([]) @map("skill_ids") @db.Uuid
+  createdAt       DateTime           @default(now()) @map("created_at")
+
+  userResponse UserResponse @relation(fields: [userResponseId], references: [id], onDelete: Cascade)
+
+  @@index([userResponseId])
+  @@map("corrections")
+}
+
+model MemoryNote {
+  id                String           @id @default(uuid()) @db.Uuid
+  userId            String           @map("user_id") @db.Uuid
+  type              MemoryType
+  content           String           @db.Text
+  structuredData    Json?            @map("structured_data")
+  confidence        Decimal          @default(0.5) @db.Decimal(3, 2)
+  visibility        MemoryVisibility @default(internal)
+  sourceSessionId   String?          @map("source_session_id") @db.Uuid
+  sourceResponseId  String?          @map("source_response_id") @db.Uuid
+  embedding         Unsupported("vector(1536)")?
+  isActive          Boolean          @default(true) @map("is_active")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+  @@index([userId, isActive])
+  @@map("memory_notes")
+}
+
+model MediaItem {
+  id              String          @id @default(uuid()) @db.Uuid
+  sourceType      MediaSourceType @map("source_type")
+  sourceUrl       String?         @map("source_url") @db.Text
+  title           String
+  language        String          @default("it")
+  transcript      String?         @db.Text
+  durationSeconds Int?            @map("duration_seconds")
+  tags            String[]        @default([])
+  rightsStatus    RightsStatus    @default(unknown) @map("rights_status")
+  metadata        Json            @default("{}")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  @@index([sourceType])
+  @@map("media_items")
+}
+
+model UserEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  eventType String   @map("event_type")
+  payload   Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, eventType])
+  @@index([eventType, createdAt])
+  @@map("user_events")
+}
+
+// ─── Gamification (PRD 09) ────────────────────────────────────────────────
+
+model UserStreak {
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @unique @map("user_id") @db.Uuid
+  currentDays       Int       @default(0) @map("current_days")
+  longestDays       Int       @default(0) @map("longest_days")
+  lastActiveDate    DateTime? @map("last_active_date") @db.Date
+  freezeTokens      Int       @default(0) @map("freeze_tokens")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_streaks")
+}
+
+model XpEntry {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  amount    Int
+  reason    String
+  sourceId  String?  @map("source_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("xp_entries")
+}
+
+// ─── Admin / Prompt Ops (PRD 13) ──────────────────────────────────────────
+
+model PromptTemplate {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String
+  version     Int
+  purpose     String
+  body        String   @db.Text
+  inputs      Json     @default("[]")
+  outputSchema Json?   @map("output_schema")
+  isEnabled   Boolean  @default(true) @map("is_enabled")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([key, version])
+  @@map("prompt_templates")
+}
+
+model FeatureFlag {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String   @unique
+  enabled   Boolean  @default(false)
+  rolloutPct Int     @default(0) @map("rollout_pct")
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("feature_flags")
+}

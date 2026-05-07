@@ -1,0 +1,123 @@
+# Render Blueprint — Speakwise.
+# Apply via: https://dashboard.render.com/blueprints → New Blueprint Instance.
+# Render will create the Postgres + Web Service + Cron Jobs and prompt for any
+# environment variables marked sync:false.
+
+databases:
+  - name: speakwise-db
+    databaseName: speakwise
+    user: speakwise
+    plan: basic-256mb
+    postgresMajorVersion: 16
+    ipAllowList: []
+
+services:
+  # ── Web (Next.js) ─────────────────────────────────────────────────────
+  - type: web
+    name: speakwise-web
+    runtime: node
+    plan: starter
+    region: oregon
+    rootDir: apps/web
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @speakwise/db prisma:generate && pnpm --filter speakwise-web build
+    startCommand: pnpm --filter speakwise-web start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    branch: main
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_URL
+        sync: false
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: speakwise-db
+          property: connectionString
+      - key: DIRECT_URL
+        fromDatabase:
+          name: speakwise-db
+          property: connectionString
+      - key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: CLERK_WEBHOOK_SECRET
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_ORG_ID
+        sync: false
+      - key: OPENAI_MODEL_FAST
+        value: gpt-4o-mini
+      - key: OPENAI_MODEL_REASONING
+        value: gpt-4o
+      - key: OPENAI_MODEL_EMBEDDING
+        value: text-embedding-3-small
+      - key: OPENAI_MODEL_STT
+        value: whisper-1
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: ELEVENLABS_VOICE_ID_IT
+        sync: false
+      - key: ELEVENLABS_VOICE_ID_EN
+        sync: false
+      - key: ELEVENLABS_MODEL_ID
+        value: eleven_turbo_v2_5
+      - key: SENTRY_DSN
+        sync: false
+      - key: NEXT_PUBLIC_SENTRY_DSN
+        sync: false
+      - key: POSTHOG_API_KEY
+        sync: false
+      - key: NEXT_PUBLIC_POSTHOG_KEY
+        sync: false
+      - key: NEXT_PUBLIC_POSTHOG_HOST
+        value: https://us.i.posthog.com
+      - key: CRON_SECRET
+        generateValue: true
+
+  # ── Cron: nightly review scheduling + comeback offers ────────────────
+  - type: cron
+    name: speakwise-cron-nightly
+    runtime: node
+    plan: starter
+    region: oregon
+    rootDir: apps/web
+    schedule: "15 7 * * *"  # 07:15 UTC daily
+    buildCommand: corepack enable && pnpm install --frozen-lockfile
+    startCommand: |
+      curl -fsS -X POST \
+        -H "Authorization: Bearer $CRON_SECRET" \
+        "$APP_URL/api/cron/nightly"
+    envVars:
+      - key: APP_URL
+        sync: false
+      - key: CRON_SECRET
+        fromService:
+          type: web
+          name: speakwise-web
+          envVarKey: CRON_SECRET
+
+  # ── Cron: hourly memory extraction batch ─────────────────────────────
+  - type: cron
+    name: speakwise-cron-memory
+    runtime: node
+    plan: starter
+    region: oregon
+    rootDir: apps/web
+    schedule: "0 * * * *"  # top of every hour
+    buildCommand: corepack enable && pnpm install --frozen-lockfile
+    startCommand: |
+      curl -fsS -X POST \
+        -H "Authorization: Bearer $CRON_SECRET" \
+        "$APP_URL/api/cron/memory-extract"
+    envVars:
+      - key: APP_URL
+        sync: false
+      - key: CRON_SECRET
+        fromService:
+          type: web
+          name: speakwise-web
+          envVarKey: CRON_SECRET
