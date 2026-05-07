@@ -1,5 +1,5 @@
-import { auth, currentUser as clerkCurrentUser } from '@clerk/nextjs/server';
 import { prisma } from '@speakwise/db';
+import { readSession } from './session';
 
 export class UnauthenticatedError extends Error {
   constructor() {
@@ -9,34 +9,21 @@ export class UnauthenticatedError extends Error {
 }
 
 export async function requireUserId(): Promise<string> {
-  const { userId } = await auth();
-  if (!userId) throw new UnauthenticatedError();
-  return userId;
+  const session = await readSession();
+  if (!session?.userId) throw new UnauthenticatedError();
+  return session.userId;
+}
+
+/** Resolve the current authenticated user from the session cookie. Throws if unauthenticated. */
+export async function getCurrentUser() {
+  const userId = await requireUserId();
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new UnauthenticatedError();
+  return user;
 }
 
 /**
- * Resolve the internal Speakwise user row for the currently authenticated
- * Clerk user. Creates one on first encounter (lazy provisioning) — Clerk's
- * webhook also creates one, but lazy provisioning means a user logging in
- * before the webhook fires still works.
+ * Backwards-compat alias used by older route handlers. New code should call
+ * getCurrentUser(). Keeping the name avoids touching every API route.
  */
-export async function getOrCreateUser() {
-  const clerkId = await requireUserId();
-  const existing = await prisma.user.findUnique({ where: { clerkUserId: clerkId } });
-  if (existing) return existing;
-
-  const cu = await clerkCurrentUser();
-  const email = cu?.emailAddresses?.[0]?.emailAddress ?? `${clerkId}@unknown.local`;
-  const name = [cu?.firstName, cu?.lastName].filter(Boolean).join(' ') || 'Learner';
-
-  return prisma.user.create({
-    data: {
-      clerkUserId: clerkId,
-      email,
-      name,
-      role: 'learner',
-      nativeLanguage: 'en',
-      targetLanguage: 'it',
-    },
-  });
-}
+export const getOrCreateUser = getCurrentUser;

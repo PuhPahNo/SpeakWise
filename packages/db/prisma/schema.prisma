@@ -229,9 +229,10 @@ enum RightsStatus {
 
 model User {
   id              String    @id @default(uuid()) @db.Uuid
-  clerkUserId     String    @unique @map("clerk_user_id")
+  username        String    @unique
+  passwordHash    String    @map("password_hash")
   name            String
-  email           String    @unique
+  email           String?   @unique
   role            UserRole  @default(learner)
   nativeLanguage  String    @default("en") @map("native_language")
   targetLanguage  String    @default("it") @map("target_language")

@@ -39,12 +39,8 @@ services:
         fromDatabase:
           name: speakwise-db
           property: connectionString
-      - key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-        sync: false
-      - key: CLERK_SECRET_KEY
-        sync: false
-      - key: CLERK_WEBHOOK_SECRET
-        sync: false
+      - key: AUTH_SESSION_SECRET
+        generateValue: true
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_ORG_ID

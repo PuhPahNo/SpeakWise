@@ -1,18 +1,41 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { NextResponse, type NextRequest } from 'next/server';
 
-const isPublicRoute = createRouteMatcher([
+const PUBLIC_PATHS = [
   '/',
-  '/sign-in(.*)',
-  '/sign-up(.*)',
+  '/sign-in',
   '/api/health',
-  '/api/webhooks/(.*)',
-  '/api/cron/(.*)',
-]);
+  '/api/auth/signin',
+  '/api/auth/signout',
+  '/api/cron',
+];
 
-export default clerkMiddleware(async (auth, req) => {
-  if (!isPublicRoute(req)) await auth.protect();
-});
+const SESSION_COOKIE = 'sw_session';
+
+function isPublic(pathname: string): boolean {
+  if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return true;
+  // Static assets and Next internals
+  if (pathname.startsWith('/_next/')) return true;
+  if (pathname.startsWith('/favicon')) return true;
+  return false;
+}
+
+export function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+  if (isPublic(pathname)) return NextResponse.next();
+
+  const hasSession = req.cookies.has(SESSION_COOKIE);
+  if (hasSession) return NextResponse.next();
+
+  // For API routes return 401; for pages, redirect to /sign-in.
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
+  }
+  const url = req.nextUrl.clone();
+  url.pathname = '/sign-in';
+  url.searchParams.set('next', pathname);
+  return NextResponse.redirect(url);
+}
 
 export const config = {
-  matcher: ['/((?!_next|.*\\..*).*)', '/(api|trpc)(.*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };

@@ -7,8 +7,8 @@ export const ServerEnvSchema = z.object({
   DATABASE_URL: z.string().url(),
   DIRECT_URL: z.string().url(),
 
-  CLERK_SECRET_KEY: z.string().min(1),
-  CLERK_WEBHOOK_SECRET: z.string().min(1),
+  /** 32+ char secret used to encrypt session cookies. Generate with: openssl rand -base64 32 */
+  AUTH_SESSION_SECRET: z.string().min(32),
 
   OPENAI_API_KEY: z.string().min(1),
   OPENAI_ORG_ID: z.string().optional(),
@@ -28,7 +28,6 @@ export const ServerEnvSchema = z.object({
 
 export const PublicEnvSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url(),
-  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().min(1),
   NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
   NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
   NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),

@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from 'next';
-import { ClerkProvider } from '@clerk/nextjs';
 import { Providers } from '@/components/providers';
 import '@/styles/globals.css';
 
@@ -23,12 +22,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider>
-      <html lang="en" className="h-full">
-        <body className="min-h-full antialiased">
-          <Providers>{children}</Providers>
-        </body>
-      </html>
-    </ClerkProvider>
+    <html lang="en" className="h-full">
+      <body className="min-h-full antialiased">
+        <Providers>{children}</Providers>
+      </body>
+    </html>
   );
 }

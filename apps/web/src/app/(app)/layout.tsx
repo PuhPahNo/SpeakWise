@@ -1,8 +1,10 @@
 import Link from 'next/link';
-import { UserButton } from '@clerk/nextjs';
 import { MobileTabBar } from '@/components/ui/mobile-tab-bar';
+import { UserMenu } from '@/components/ui/user-menu';
+import { getCurrentUser } from '@/lib/auth/current-user';
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const user = await getCurrentUser();
   return (
     <div className="min-h-screen flex flex-col">
       <header className="sticky top-0 z-30 border-b border-ink-200 bg-ink-50/90 backdrop-blur supports-[backdrop-filter]:bg-ink-50/70 px-4 sm:px-6 py-3 flex items-center justify-between">
@@ -15,7 +17,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <Link href="/progress" className="hover:text-ink-900">Progress</Link>
           <Link href="/profile" className="hover:text-ink-900">Profile</Link>
         </nav>
-        <UserButton afterSignOutUrl="/" />
+        <UserMenu name={user.name} />
       </header>
       <main className="flex-1 pb-20 md:pb-0">{children}</main>
       <MobileTabBar />
