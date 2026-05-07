@@ -11,8 +11,8 @@ Voice-first AI Italian-language tutor. Personal, memory-centric, gamified.
 
 ```
 apps/
-  web/        Next.js 15 (App Router) — web UI + REST API + cron endpoints
-  mobile/     Expo (SDK 52) — iOS/Android shell, calls the same API
+  web/        Next.js 15 (App Router) — UI + REST API + cron endpoints
+              Mobile-first responsive design; works on phones + tablets + desktop
 packages/
   types/      Canonical TypeScript types for every entity in Tech Arch §6
   schemas/    Zod runtime validators (AI outputs, API I/O, env)
@@ -29,8 +29,8 @@ render.yaml   Render Blueprint — Postgres + web service + cron jobs
 
 Locked in [`docs/ADR-0001-stack.md`](./docs/ADR-0001-stack.md). Highlights:
 
-- **Web:** Next.js 15 + React 19 + Tailwind + shadcn/ui + Framer Motion + TanStack Query
-- **Mobile:** Expo SDK 52 + expo-router + Clerk Expo + expo-audio
+- **Web (only client):** Next.js 15 + React 19 + Tailwind 3 + shadcn/ui + Framer Motion + TanStack Query
+- **Responsive:** Mobile-first. Default styles target a 360-wide phone; `sm:`/`md:` breakpoints progressively enhance for tablet/desktop. All touch targets ≥ 44×44px.
 - **Backend:** Next.js Route Handlers + Server Actions in `apps/web`
 - **DB:** PostgreSQL on Render with `pgvector` for memory embeddings
 - **ORM:** Prisma
@@ -62,10 +62,11 @@ pnpm --filter @speakwise/db seed
 # 5. Run web
 pnpm --filter speakwise-web dev
 # → http://localhost:3000
-
-# 6. (optional) Run mobile
-pnpm --filter speakwise-mobile start
 ```
+
+To test the mobile experience locally, open Chrome / Safari DevTools and toggle
+the device toolbar (a phone-sized viewport like iPhone 14 Pro). On a real
+phone, point the phone at your laptop's local IP on port 3000.
 
 ### Required external accounts
 
@@ -74,7 +75,7 @@ You must create these yourself — see `.env.example` for which keys go where:
 | Service     | Why                                                    | Where                                               |
 | ----------- | ------------------------------------------------------ | --------------------------------------------------- |
 | Render      | Postgres + web service + cron                          | https://dashboard.render.com                        |
-| Clerk       | Auth (web + mobile)                                    | https://dashboard.clerk.com                         |
+| Clerk       | Auth                                                   | https://dashboard.clerk.com                         |
 | OpenAI      | LLM, STT (Whisper), embeddings                         | https://platform.openai.com/api-keys                |
 | ElevenLabs  | TTS for Wise (pick Italian + English voices)           | https://elevenlabs.io/app/settings/api-keys         |
 | Sentry      | Errors (optional)                                      | https://sentry.io                                   |
@@ -136,4 +137,3 @@ human-only items (see ADR §"Open items deferred"):
 - Selecting specific ElevenLabs voice IDs for Italian + English
 - Writing the privacy policy / ToS
 - Sourcing rights-cleared media for PRD 10
-- Apple/Google developer accounts for mobile distribution

@@ -6,7 +6,7 @@
 
 ## Context
 
-The user (owner) directed: OpenAI for LLM, ElevenLabs likely for TTS, "industry standard" for everything else, Render for hosting, web + mobile for launch surface, autonomous build, no per-decision sign-off.
+The user (owner) directed: OpenAI for LLM, ElevenLabs likely for TTS, "industry standard" for everything else, Render for hosting, **web only** (no native mobile app — the website itself must work well on mobile browsers), autonomous build, no per-decision sign-off.
 
 This ADR locks every concrete choice so downstream agents (and future Claude sessions) do not relitigate them.
 
@@ -18,22 +18,18 @@ This ADR locks every concrete choice so downstream agents (and future Claude ses
 - **Monorepo orchestrator:** Turborepo.
 - **Lint + format:** Biome (replaces ESLint + Prettier, single binary, fast).
 - **Validation:** Zod for all runtime contracts (API I/O, AI outputs, env).
-- **Testing:** Vitest (unit + integration), Playwright (web e2e). Mobile e2e deferred.
+- **Testing:** Vitest (unit + integration), Playwright (e2e — desktop and mobile viewports).
 
-### Web
+### Web (the only client)
 - **Framework:** Next.js 15 (App Router, RSC, Route Handlers).
-- **UI:** React 19, Tailwind CSS 4, shadcn/ui, Framer Motion.
+- **UI:** React 19, Tailwind CSS 3, shadcn/ui, Framer Motion.
+- **Responsive design:** Mobile-first. Tailwind breakpoints `sm` (640px) and up are progressive enhancements; the default styles target a 360px-wide phone viewport. Every interactive element is sized for touch (min 44×44px hit area).
 - **State:** TanStack Query for server state, Zustand for client state.
-- **Voice in browser:** MediaRecorder + Web Audio API for capture; HTMLAudioElement for playback.
-
-### Mobile
-- **Framework:** Expo (latest SDK), React Native, expo-router (file-based).
-- **UI:** NativeWind (Tailwind for RN) so styles share with web where possible.
-- **Voice on device:** expo-audio for capture and playback.
-- **Distribution:** Expo EAS Build, OTA updates via expo-updates. Not on Render — Render does not host mobile apps.
+- **Voice in browser:** MediaRecorder + Web Audio API for capture; HTMLAudioElement for playback. Works on mobile Safari and Chrome.
+- **PWA-ready:** Manifest + service worker can be added later for "add to home screen" without a native app.
 
 ### Backend
-- **Surface:** Next.js Route Handlers + Server Actions inside `apps/web`. One Render Web Service to deploy. Mobile calls the same routes. Splitting into a separate Node service is deferred until traffic justifies it.
+- **Surface:** Next.js Route Handlers + Server Actions inside `apps/web`. One Render Web Service to deploy. Splitting into a separate Node service is deferred until traffic justifies it.
 - **Server framework:** Next.js (no NestJS/Express layer).
 - **Background jobs:** Render Cron Jobs for scheduled work (review reminders, comeback offers, daily report generation). Heavier queues (BullMQ + Redis/Render Key-Value) deferred until needed.
 
@@ -44,7 +40,7 @@ This ADR locks every concrete choice so downstream agents (and future Claude ses
 - **Connection pooling:** PgBouncer (Render provides) via `DATABASE_URL`; Prisma migrations use `DIRECT_URL`.
 
 ### Auth
-- **Provider:** Clerk. Plays cleanly with both Next.js (App Router) and Expo. Handles email, social, MFA, JWT issuance for mobile, webhooks for user lifecycle.
+- **Provider:** Clerk. Plays cleanly with Next.js App Router. Handles email, social, MFA, webhooks for user lifecycle.
 - **Session-to-user mapping:** `User.id` is our internal UUID. We map `clerkUserId` → `User.id` in a join column.
 
 ### AI Providers
@@ -58,7 +54,7 @@ This ADR locks every concrete choice so downstream agents (and future Claude ses
 - **Architecture rule:** all provider calls go through `packages/ai`. No direct `openai` or `elevenlabs` imports in apps or services.
 
 ### Observability
-- **Errors:** Sentry (web + mobile + server).
+- **Errors:** Sentry (browser + server).
 - **Product analytics:** PostHog.
 - **Logs:** Pino on the server, structured JSON.
 - **Cost monitoring:** Per-request metadata (`UserEvent` with `event_type=ai_call`, payload includes `provider`, `model`, `tokens_in`, `tokens_out`, `latency_ms`).
@@ -67,14 +63,14 @@ This ADR locks every concrete choice so downstream agents (and future Claude ses
 - **Web Service:** Next.js on Render Web Service (Node). Defined in `render.yaml`.
 - **Database:** Render PostgreSQL.
 - **Cron Jobs:** Render Cron Jobs hitting internal endpoints in the web service.
-- **Mobile:** Expo EAS Build → TestFlight + Play Internal Testing → Production.
 - **Branching:** trunk (`main`). Render auto-deploys on push to `main`. No staging branch initially; preview environments via Render preview environments later.
 
 ## Consequences
 
 ### Positive
 - Single Render service to operate. Single Postgres. Single LLM vendor. Low operational surface.
-- TypeScript end-to-end means shared types between web, mobile, and server with zero serialization mismatch.
+- TypeScript end-to-end means shared types between client and server with zero serialization mismatch.
+- No App Store / Play Store gatekeepers, no native build pipeline, no second auth surface, no second analytics surface.
 - Clerk + Render + OpenAI are all well-documented; new sessions can recover context from public docs.
 
 ### Negative / accepted trade-offs
@@ -82,12 +78,13 @@ This ADR locks every concrete choice so downstream agents (and future Claude ses
 - **Single Render region** — no multi-region until needed.
 - **Next.js API routes for the backend** — fine until ~50k DAU; will revisit.
 - **Clerk** has its own pricing curve; acceptable at launch, will reassess at scale.
+- **No native app** — no offline mode, no push notifications, no App Store discoverability. Acceptable for v1; revisit if retention data demands it.
 - **No staging environment** — ship gated by feature flags + the A13 eval harness instead.
 
 ## Open items deferred (not blockers)
 - Italian voice talent decision (specific ElevenLabs voice IDs) — will pick best-rated Italian male+female for Wise.
 - Whether to add Redis + BullMQ — defer until first slow background job.
-- Mobile push notifications — defer to retention phase.
+- PWA install prompt + service worker (so the website can be added to the home screen) — defer to retention phase.
 - COPPA / GDPR — will write privacy policy at launch readiness.
 
 ## References

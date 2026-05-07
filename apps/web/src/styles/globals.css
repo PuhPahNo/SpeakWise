@@ -5,13 +5,42 @@
 :root {
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-display: 'Fraunces', Georgia, serif;
+  /* iOS safe-area insets — used in components via env(safe-area-inset-*) */
+  --safe-top: env(safe-area-inset-top);
+  --safe-bottom: env(safe-area-inset-bottom);
 }
 
-html, body { height: 100%; }
+html { height: 100%; -webkit-text-size-adjust: 100%; }
 body {
-  @apply bg-ink-50 text-ink-900 antialiased;
+  @apply bg-ink-50 text-ink-900;
   font-family: var(--font-sans);
+  /* Prevent horizontal scroll on small viewports */
+  overflow-x: hidden;
 }
 @media (prefers-color-scheme: dark) {
   body { @apply bg-ink-900 text-ink-50; }
+}
+
+/* Prevent iOS auto-zoom when focusing inputs (font-size must be ≥16px) */
+input, textarea, select { font-size: 16px; }
+@media (min-width: 640px) {
+  input, textarea, select { font-size: inherit; }
+}
+
+/* Larger touch targets on small screens */
+@media (max-width: 640px) {
+  button, [role="button"], a.btn, .touch-target {
+    min-height: 44px;
+  }
+}
+
+/* Tap highlight cleanup */
+* { -webkit-tap-highlight-color: transparent; }
+
+/* Smooth focus rings only on keyboard */
+*:focus { outline: none; }
+*:focus-visible {
+  outline: 2px solid theme('colors.wise.500');
+  outline-offset: 2px;
+  border-radius: 6px;
 }

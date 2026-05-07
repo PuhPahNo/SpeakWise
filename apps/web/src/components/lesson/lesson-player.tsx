@@ -135,12 +135,12 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
 
   if (completed) {
     return (
-      <div className="rounded-2xl bg-wise-50 p-8 text-center">
-        <div className="font-display text-2xl">Mission complete.</div>
+      <div className="rounded-2xl bg-wise-50 p-6 sm:p-8 text-center">
+        <div className="font-display text-xl sm:text-2xl">Mission complete.</div>
         <p className="text-ink-600 mt-2">Wise is updating your memory…</p>
         <button
           onClick={() => router.push('/command-center')}
-          className="mt-6 rounded-full bg-wise-500 text-white px-6 py-3 hover:bg-wise-600"
+          className="mt-5 sm:mt-6 w-full sm:w-auto rounded-full bg-wise-500 text-white px-6 py-3 hover:bg-wise-600"
         >
           Back to home
         </button>
@@ -153,7 +153,7 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
       <button
         onClick={startSession}
         disabled={pending}
-        className="rounded-full bg-wise-500 text-white px-6 py-3 hover:bg-wise-600 disabled:opacity-50"
+        className="w-full sm:w-auto rounded-full bg-wise-500 text-white px-6 py-3 hover:bg-wise-600 disabled:opacity-50"
       >
         {pending ? 'Starting…' : 'Begin lesson →'}
       </button>
@@ -165,7 +165,7 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
       <button
         onClick={finish}
         disabled={pending}
-        className="rounded-full bg-wise-500 text-white px-6 py-3 hover:bg-wise-600"
+        className="w-full sm:w-auto rounded-full bg-wise-500 text-white px-6 py-3 hover:bg-wise-600"
       >
         Finish lesson
       </button>
@@ -175,11 +175,19 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
   const opts = (currentTask.options ?? null) as Array<{ value: string; label: string }> | null;
 
   return (
-    <div className="rounded-2xl border border-ink-200 bg-white p-6">
-      <div className="text-xs text-ink-500 uppercase tracking-wider">
-        Task {taskIndex + 1} of {tasks.length} · {currentTask.taskType.replace(/_/g, ' ')}
+    <div className="rounded-2xl border border-ink-200 bg-white p-4 sm:p-6">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-xs text-ink-500 uppercase tracking-wider truncate">
+          {taskIndex + 1} / {tasks.length} · {currentTask.taskType.replace(/_/g, ' ')}
+        </div>
+        <div className="h-1 w-20 sm:w-32 bg-ink-100 rounded-full overflow-hidden shrink-0" aria-hidden="true">
+          <div
+            className="h-full bg-wise-500 transition-all"
+            style={{ width: `${((taskIndex + 1) / tasks.length) * 100}%` }}
+          />
+        </div>
       </div>
-      <div className="font-display text-xl mt-2">{currentTask.prompt}</div>
+      <div className="font-display text-lg sm:text-xl mt-3 leading-snug">{currentTask.prompt}</div>
 
       {opts ? (
         <div className="mt-4 space-y-2">
@@ -187,10 +195,10 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
             <button
               key={o.value}
               onClick={() => setAnswer(o.value)}
-              className={`block w-full text-left rounded-lg border px-4 py-3 text-sm transition ${
+              className={`block w-full text-left rounded-lg border px-4 py-3 transition ${
                 answer === o.value
                   ? 'border-wise-500 bg-wise-50'
-                  : 'border-ink-200 hover:border-ink-300'
+                  : 'border-ink-200 hover:border-ink-300 active:bg-ink-50'
               }`}
             >
               {o.label}
@@ -198,7 +206,7 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
           ))}
         </div>
       ) : (
-        <div className="mt-4 flex flex-col gap-2">
+        <div className="mt-4 flex flex-col gap-3">
           <textarea
             value={answer}
             onChange={(e) => setAnswer(e.target.value)}
@@ -208,23 +216,41 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
                 : 'Type your answer…'
             }
             rows={3}
-            className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm"
+            autoCapitalize="sentences"
+            className="w-full rounded-lg border border-ink-200 px-3 py-2"
           />
           {currentTask.taskType === 'speaking_prompt' && (
             <button
               onClick={recording ? stopRecording : startRecording}
-              className={`self-start rounded-full px-4 py-2 text-sm ${
+              aria-label={recording ? 'Stop recording' : 'Record speech'}
+              className={`self-start inline-flex items-center gap-2 rounded-full px-5 py-3 ${
                 recording ? 'bg-red-500 text-white' : 'bg-ink-100 hover:bg-ink-200'
               }`}
             >
-              {recording ? '■ Stop' : '🎤 Speak'}
+              {recording ? (
+                <>
+                  <span aria-hidden>■</span>
+                  <span>Stop</span>
+                </>
+              ) : (
+                <>
+                  <span aria-hidden>🎤</span>
+                  <span>Speak</span>
+                </>
+              )}
             </button>
           )}
         </div>
       )}
 
       {correction ? (
-        <div className={`mt-5 rounded-lg p-4 text-sm ${correction.isCorrect ? 'bg-emerald-50 text-emerald-900' : 'bg-amber-50 text-amber-900'}`}>
+        <div
+          className={`mt-5 rounded-lg p-4 text-sm ${
+            correction.isCorrect
+              ? 'bg-emerald-50 text-emerald-900'
+              : 'bg-amber-50 text-amber-900'
+          }`}
+        >
           <div className="font-semibold">
             {correction.isCorrect ? '✓ Correct' : 'Not quite —'}
             {correction.encouragement ? ` ${correction.encouragement}` : ''}
@@ -237,7 +263,7 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
           <div className="mt-2 text-ink-700">{correction.explanation}</div>
           <button
             onClick={next}
-            className="mt-3 rounded-full bg-wise-500 text-white px-5 py-2 text-sm hover:bg-wise-600"
+            className="mt-4 w-full sm:w-auto rounded-full bg-wise-500 text-white px-5 py-3 hover:bg-wise-600"
           >
             {taskIndex + 1 < tasks.length ? 'Next →' : 'Finish lesson'}
           </button>
@@ -246,7 +272,7 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
         <button
           onClick={submit}
           disabled={pending || !answer.trim()}
-          className="mt-4 rounded-full bg-wise-500 text-white px-5 py-2 text-sm hover:bg-wise-600 disabled:opacity-50"
+          className="mt-5 w-full sm:w-auto rounded-full bg-wise-500 text-white px-5 py-3 hover:bg-wise-600 disabled:opacity-50"
         >
           {pending ? 'Checking…' : 'Submit'}
         </button>

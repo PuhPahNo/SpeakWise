@@ -50,8 +50,8 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="max-w-xl mx-auto px-6 py-10">
-      <h1 className="font-display text-2xl mb-6">Let’s get to know you.</h1>
+    <div className="max-w-xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+      <h1 className="font-display text-2xl sm:text-3xl mb-5 sm:mb-6">Let's get to know you.</h1>
       <div className="space-y-3 mb-6">
         {turns.map((t, i) => (
           <div key={i} className={t.role === 'user' ? 'text-ink-900' : 'text-ink-700 italic'}>
@@ -61,27 +61,34 @@ export default function OnboardingPage() {
         ))}
       </div>
       {!done ? (
-        <div className="flex gap-2">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            send();
+          }}
+          className="flex gap-2"
+        >
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && send()}
             disabled={pending}
             placeholder="Type your answer…"
-            className="flex-1 rounded-lg border border-ink-200 px-3 py-2 text-sm"
+            enterKeyHint="send"
+            autoCapitalize="sentences"
+            className="flex-1 min-w-0 rounded-lg border border-ink-200 px-3 py-2"
           />
           <button
-            onClick={send}
+            type="submit"
             disabled={pending || !input.trim()}
-            className="rounded-lg bg-wise-500 text-white px-4 text-sm hover:bg-wise-600 disabled:opacity-50"
+            className="rounded-lg bg-wise-500 text-white px-4 py-2 hover:bg-wise-600 disabled:opacity-50 shrink-0"
           >
             Send
           </button>
-        </div>
+        </form>
       ) : (
         <button
           onClick={() => router.push('/command-center')}
-          className="rounded-full bg-wise-500 text-white px-6 py-3 hover:bg-wise-600"
+          className="w-full sm:w-auto rounded-full bg-wise-500 text-white px-6 py-3 hover:bg-wise-600"
         >
           Take me to my first lesson →
         </button>

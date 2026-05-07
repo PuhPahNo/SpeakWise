@@ -44,15 +44,25 @@ export function ProfileEditor({ profile }: { profile: Profile }) {
   }
 
   return (
-    <div className="space-y-5 rounded-2xl border border-ink-200 bg-white p-6">
+    <div className="space-y-5 rounded-2xl border border-ink-200 bg-white p-4 sm:p-6">
       <Field label="Goals (comma-separated)">
-        <input value={goals} onChange={(e) => setGoals(e.target.value)} className="input" />
+        <input
+          value={goals}
+          onChange={(e) => setGoals(e.target.value)}
+          className="sw-input"
+          autoCapitalize="sentences"
+        />
       </Field>
       <Field label="Interests (comma-separated)">
-        <input value={interests} onChange={(e) => setInterests(e.target.value)} className="input" />
+        <input
+          value={interests}
+          onChange={(e) => setInterests(e.target.value)}
+          className="sw-input"
+          autoCapitalize="sentences"
+        />
       </Field>
       <Field label="Current level">
-        <select value={level} onChange={(e) => setLevel(e.target.value)} className="input">
+        <select value={level} onChange={(e) => setLevel(e.target.value)} className="sw-input">
           <option value="complete_beginner">Complete beginner</option>
           <option value="beginner">Beginner</option>
           <option value="lower_intermediate">Lower intermediate</option>
@@ -65,7 +75,7 @@ export function ProfileEditor({ profile }: { profile: Profile }) {
         <select
           value={correctionStyle}
           onChange={(e) => setCorrectionStyle(e.target.value)}
-          className="input"
+          className="sw-input"
         >
           <option value="adaptive">Adaptive</option>
           <option value="gentle">Gentle</option>
@@ -78,31 +88,36 @@ export function ProfileEditor({ profile }: { profile: Profile }) {
       <Field label="Preferred session length (minutes)">
         <input
           type="number"
+          inputMode="numeric"
           value={duration}
           onChange={(e) => setDuration(Number(e.target.value))}
-          className="input"
+          className="sw-input"
         />
       </Field>
       <Field label="Notes (motivation, context)">
-        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="input" rows={3} />
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          className="sw-input"
+          rows={3}
+        />
       </Field>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <button
           onClick={save}
           disabled={saving}
-          className="rounded-full bg-wise-500 text-white px-5 py-2 text-sm hover:bg-wise-600 disabled:opacity-50"
+          className="w-full sm:w-auto rounded-full bg-wise-500 text-white px-5 py-3 hover:bg-wise-600 disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Save'}
         </button>
         {saved && <span className="text-sm text-emerald-700">Saved.</span>}
       </div>
       <style jsx>{`
-        .input {
+        .sw-input {
           width: 100%;
           border: 1px solid #e5e3da;
           border-radius: 0.5rem;
-          padding: 0.5rem 0.75rem;
-          font-size: 0.875rem;
+          padding: 0.625rem 0.75rem;
         }
       `}</style>
     </div>

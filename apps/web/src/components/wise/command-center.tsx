@@ -93,22 +93,30 @@ export function CommandCenter() {
           </div>
         ))}
       </div>
-      <div className="border-t border-ink-200 p-3 flex gap-2">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          send();
+        }}
+        className="border-t border-ink-200 p-3 flex gap-2"
+      >
         <input
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && send()}
-          placeholder="Make today’s lesson about ordering at a Roman trattoria…"
-          className="flex-1 rounded-lg border border-ink-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-wise-300"
+          placeholder="Make today's lesson about a trattoria…"
+          enterKeyHint="send"
+          autoCapitalize="sentences"
+          autoComplete="off"
+          className="flex-1 min-w-0 rounded-lg border border-ink-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-wise-300"
         />
         <button
-          onClick={send}
+          type="submit"
           disabled={pending || !message.trim()}
-          className="rounded-lg bg-wise-500 text-white px-4 text-sm hover:bg-wise-600 disabled:opacity-50"
+          className="rounded-lg bg-wise-500 text-white px-4 py-2 hover:bg-wise-600 disabled:opacity-50 shrink-0"
         >
           Send
         </button>
-      </div>
+      </form>
     </div>
   );
 }
