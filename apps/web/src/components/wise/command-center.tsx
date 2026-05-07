@@ -2,6 +2,14 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { VoiceOrb } from '@/components/voice/voice-orb';
+import { useVoiceTutor } from '@/hooks/use-voice-tutor';
+
+interface Props {
+  firstName: string;
+  recommendationReason: string;
+  sessionMinutes: number;
+}
 
 interface WiseTurn {
   intent: string;
@@ -9,42 +17,56 @@ interface WiseTurn {
   actions: Array<{ type: string; lessonId?: string }>;
 }
 
-export function CommandCenter() {
+export function CommandCenter({ firstName, recommendationReason, sessionMinutes }: Props) {
   const router = useRouter();
-  const [message, setMessage] = useState('');
-  const [history, setHistory] = useState<Array<{ role: 'user' | 'wise'; text: string }>>([]);
+  const [wiseLine, setWiseLine] = useState<string>('');
+  const [userLine, setUserLine] = useState<string>('');
   const [pending, setPending] = useState(false);
 
-  async function send() {
-    if (!message.trim()) return;
-    const userMsg = message;
-    setHistory((h) => [...h, { role: 'user', text: userMsg }]);
-    setMessage('');
+  const tutor = useVoiceTutor({
+    sttLanguage: 'en',
+    ttsLanguage: 'en',
+    onUserSpeech: async (text) => {
+      setUserLine(text);
+      await sendToWise(text);
+    },
+  });
+
+  async function sendToWise(message: string) {
     setPending(true);
     try {
       const res = await fetch('/api/wise/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'text', message: userMsg, context: { screen: 'command_center' } }),
+        body: JSON.stringify({
+          mode: 'voice',
+          message,
+          context: { screen: 'command_center' },
+        }),
       });
       const data: WiseTurn = await res.json();
-      setHistory((h) => [...h, { role: 'wise', text: data.wiseMessage }]);
+      setWiseLine(data.wiseMessage);
+      void tutor.speak(data.wiseMessage);
+
       const startAction = data.actions.find((a) => a.type === 'START_LESSON' && a.lessonId);
       if (startAction?.lessonId) {
         router.push(`/lesson/${startAction.lessonId}`);
+        return;
       }
       const generateAction = data.actions.find((a) => a.type === 'GENERATE_LESSON');
       if (generateAction) {
         const gen = await fetch('/api/lessons/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lessonType: 'daily_mission', userRequest: userMsg }),
+          body: JSON.stringify({ lessonType: 'daily_mission', userRequest: message }),
         });
         const out = await gen.json();
         if (out.lesson?.id) router.push(`/lesson/${out.lesson.id}`);
       }
-    } catch (e) {
-      setHistory((h) => [...h, { role: 'wise', text: 'Sorry — something went wrong. Try again?' }]);
+    } catch {
+      const fallback = 'Sorry — something went sideways. Try again?';
+      setWiseLine(fallback);
+      void tutor.speak(fallback);
     } finally {
       setPending(false);
     }
@@ -65,58 +87,81 @@ export function CommandCenter() {
     }
   }
 
+  function statusText(): string {
+    switch (tutor.state) {
+      case 'speaking':
+        return 'Wise is speaking…';
+      case 'listening':
+        return 'Listening — tap to stop';
+      case 'processing_transcription':
+        return 'Got it — transcribing…';
+      case 'thinking':
+        return 'Thinking…';
+      case 'awaiting_user_response':
+      case 'idle':
+      case 'paused':
+      default:
+        return pending ? 'Working…' : 'Tap the orb to talk to Wise';
+    }
+  }
+
+  function onOrbTap() {
+    if (tutor.state === 'speaking') {
+      tutor.cancel();
+      return;
+    }
+    void tutor.toggleListen();
+  }
+
   return (
-    <div className="rounded-2xl border border-ink-200 bg-white">
-      <div className="px-5 py-4 border-b border-ink-200">
-        <div className="font-display text-lg">Talk to Wise</div>
-        <div className="text-sm text-ink-500">
-          Ask for a lesson, request a topic, or just say hi.
-        </div>
+    <div className="flex flex-col items-center gap-8 sm:gap-10">
+      <div className="text-center w-full">
+        <div className="text-xs uppercase tracking-[0.2em] text-ink-200">Today</div>
+        <h1 className="font-display text-3xl sm:text-4xl text-ink-50 mt-2 leading-tight">
+          Welcome back, {firstName}.
+        </h1>
+        <p className="text-sm sm:text-base text-ink-200 mt-2 max-w-md mx-auto">
+          {recommendationReason}
+        </p>
       </div>
-      <div className="p-5 space-y-3 min-h-[200px] max-h-[400px] overflow-y-auto">
-        {history.length === 0 && (
-          <button
-            onClick={startMission}
-            disabled={pending}
-            className="text-sm text-wise-600 hover:underline"
-          >
-            {pending ? 'Building…' : 'Or just start today’s mission →'}
-          </button>
+
+      <VoiceOrb
+        state={tutor.state}
+        size="lg"
+        amplitude={tutor.amplitude}
+        onTap={onOrbTap}
+      />
+
+      <div className="text-center min-h-[3.5rem] max-w-xl">
+        {wiseLine ? (
+          <p className="font-display text-xl sm:text-2xl text-ink-50 animate-fade-up">{wiseLine}</p>
+        ) : (
+          <p className="text-ink-200 text-sm">{statusText()}</p>
         )}
-        {history.map((m, i) => (
-          <div
-            key={i}
-            className={`text-sm ${m.role === 'user' ? 'text-ink-900' : 'text-ink-700 italic'}`}
-          >
-            <span className="font-semibold mr-2">{m.role === 'user' ? 'You' : 'Wise'}</span>
-            {m.text}
-          </div>
-        ))}
+        {userLine && (
+          <p className="mt-2 text-sm text-ink-200 italic">you: &ldquo;{userLine}&rdquo;</p>
+        )}
       </div>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          send();
-        }}
-        className="border-t border-ink-200 p-3 flex gap-2"
-      >
-        <input
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Make today's lesson about a trattoria…"
-          enterKeyHint="send"
-          autoCapitalize="sentences"
-          autoComplete="off"
-          className="flex-1 min-w-0 rounded-lg border border-ink-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-wise-300"
-        />
+
+      <div className="grid sm:grid-cols-2 gap-3 sm:gap-4 w-full max-w-xl">
         <button
-          type="submit"
-          disabled={pending || !message.trim()}
-          className="rounded-lg bg-wise-500 text-white px-4 py-2 hover:bg-wise-600 disabled:opacity-50 shrink-0"
+          onClick={startMission}
+          disabled={pending}
+          className="text-left rounded-2xl p-5 sm:p-6 bg-wise-500 hover:bg-wise-600 active:bg-wise-700 text-ink-900 transition disabled:opacity-60"
         >
-          Send
+          <div className="text-[11px] uppercase tracking-[0.2em] opacity-80">Start now</div>
+          <div className="font-display text-xl sm:text-2xl mt-2">Today&apos;s mission</div>
+          <div className="text-sm mt-1 opacity-90">~{sessionMinutes} min</div>
         </button>
-      </form>
+        <a
+          href="/vocabulary?dueForReview=true"
+          className="text-left rounded-2xl p-5 sm:p-6 surface text-ink-50 hover:border-wise-500/40 transition"
+        >
+          <div className="text-[11px] uppercase tracking-[0.2em] text-ink-200">Review</div>
+          <div className="font-display text-xl sm:text-2xl mt-2">Vocabulary due</div>
+          <div className="text-sm mt-1 text-ink-200">Catch up on what you&apos;ve learned</div>
+        </a>
+      </div>
     </div>
   );
 }
