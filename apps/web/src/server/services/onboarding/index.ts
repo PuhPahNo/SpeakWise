@@ -1,20 +1,79 @@
+import { z } from 'zod';
 import { prisma, type SessionMode, type CEFRLevel } from '@speakwise/db';
 import { Models, chatStructured } from '@speakwise/ai';
 import { PlacementAssessmentOutputSchema } from '@speakwise/schemas';
 import { emitUserEvent } from '@speakwise/events';
 import { ensureProfile, updateProfile } from '../profile';
 
+const ONBOARDING_FIELDS = [
+  'goals',
+  'interests',
+  'currentLevel',
+  'preferredSessionLengthMinutes',
+  'preferredCorrectionStyle',
+  'preferredWisePersonality',
+] as const;
+
+const OnboardingTurnSchema = z.object({
+  wiseMessage: z.string().min(2).max(500),
+  // Whatever the model extracted from this turn
+  extracted: z.object({
+    goals: z.array(z.string().min(1).max(200)).max(8).optional(),
+    interests: z.array(z.string().min(1).max(80)).max(12).optional(),
+    currentLevel: z
+      .enum([
+        'complete_beginner',
+        'beginner',
+        'lower_intermediate',
+        'intermediate',
+        'upper_intermediate',
+        'advanced',
+      ])
+      .optional(),
+    preferredSessionLengthMinutes: z.number().int().min(2).max(60).optional(),
+    preferredCorrectionStyle: z
+      .enum([
+        'gentle',
+        'direct',
+        'strict',
+        'end_of_task',
+        'major_mistakes_only',
+        'adaptive',
+      ])
+      .optional(),
+    preferredWisePersonality: z
+      .enum([
+        'default',
+        'friendly_tutor',
+        'direct_coach',
+        'game_master',
+        'premium_assistant',
+        'strict_grammar_coach',
+        'casual_companion',
+      ])
+      .optional(),
+    motivationNotes: z.string().max(2000).optional(),
+  }),
+  /** Whether the conversation should keep going. */
+  done: z.boolean(),
+});
+
 export async function startOnboarding(userId: string, mode: SessionMode) {
   await ensureProfile(userId);
   const session = await prisma.session.create({
     data: { userId, sessionType: 'onboarding', mode, status: 'active' },
   });
-  await emitUserEvent(userId, 'OnboardingStarted', { mode: mode === 'voice' ? 'voice' : 'text' });
+  await emitUserEvent(userId, 'OnboardingStarted', {
+    mode: mode === 'voice' ? 'voice' : 'text',
+  });
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+  const firstName = user.name.split(' ')[0] ?? user.name;
   return {
     sessionId: session.id,
     wiseMessage:
-      "Welcome to Speakwise. I’m Wise, your Italian tutor. " +
-      "Tell me — what brings you to Italian? Any specific reason or goal?",
+      `Ciao ${firstName}, I'm Wise. I'll be your Italian tutor. ` +
+      `In a minute or two I'll learn enough about you to build a plan that fits — ` +
+      `let's start: what's drawing you to Italian?`,
   };
 }
 
@@ -28,91 +87,115 @@ export async function respondOnboarding(
   });
   if (!session) throw new Error('Onboarding session not found');
 
-  const transcript = (session.transcript as Array<{ role: string; text: string }> | null) ?? [];
+  const transcript =
+    (session.transcript as Array<{ role: string; text: string }> | null) ?? [];
   transcript.push({ role: 'user', text });
 
-  // Simple state-machine over the transcript length (4 prompts, then placement)
-  const turn = transcript.filter((t) => t.role === 'user').length;
-  let nextStep: string;
-  let wiseMessage: string;
-  let extractedProfileUpdates: Record<string, unknown> = {};
+  const profile = await prisma.learnerProfile.findUniqueOrThrow({
+    where: { userId },
+  });
 
-  switch (turn) {
-    case 1: {
-      // After "what brings you" — ask interests
-      wiseMessage =
-        "Great. What topics actually interest you? Food, travel, music, family, sports, business — any of those?";
-      nextStep = 'interests';
-      const goals = [text.slice(0, 200)];
-      await updateProfile(userId, { goals });
-      extractedProfileUpdates = { goals };
-      break;
-    }
-    case 2: {
-      const interests = text.split(/[,;]/).map((s) => s.trim()).filter(Boolean).slice(0, 8);
-      await updateProfile(userId, { interests });
-      wiseMessage =
-        "Got it. How would you describe your Italian level today: complete beginner, beginner, intermediate, or advanced?";
-      nextStep = 'level';
-      extractedProfileUpdates = { interests };
-      break;
-    }
-    case 3: {
-      const level = mapLevelText(text);
-      await updateProfile(userId, { currentLevel: level });
-      wiseMessage =
-        "Perfect. Last one: how many minutes per session works for you — 5, 10, 15, or 20?";
-      nextStep = 'session_length';
-      extractedProfileUpdates = { currentLevel: level };
-      break;
-    }
-    case 4: {
-      const minutes = Number(text.replace(/\D/g, '')) || 10;
-      await updateProfile(userId, {
-        preferredSessionLengthMinutes: minutes,
-        onboardingCompleted: true,
-      });
-      const profile = await prisma.learnerProfile.findUnique({ where: { userId } });
-      await prisma.session.update({
-        where: { id: sessionId },
-        data: { status: 'completed', transcript, completedAt: new Date() },
-      });
-      await emitUserEvent(userId, 'OnboardingCompleted', {
-        profileId: profile?.id ?? '',
-        nativeLanguage: 'en',
-        targetLanguage: 'it',
-        level: (profile?.currentLevel ?? 'beginner') as CEFRLevel,
-        goals: profile?.goals ?? [],
-        interests: profile?.interests ?? [],
-      });
-      wiseMessage =
-        "Wonderful — I’ve got everything I need to build your first mission. Ready when you are.";
-      nextStep = 'complete';
-      extractedProfileUpdates = { preferredSessionLengthMinutes: minutes, onboardingCompleted: true };
-      break;
-    }
-    default:
-      wiseMessage = "We’re all set. Let’s start your first lesson.";
-      nextStep = 'complete';
+  // Snapshot of what we already know — used to avoid re-asking what's filled.
+  const known = {
+    goals: profile.goals ?? [],
+    interests: profile.interests ?? [],
+    currentLevel: profile.currentLevel,
+    preferredSessionLengthMinutes: profile.preferredSessionLengthMinutes,
+    preferredCorrectionStyle: profile.preferredCorrectionStyle,
+    preferredWisePersonality: profile.preferredWisePersonality,
+  };
+
+  const missing = ONBOARDING_FIELDS.filter((f) => {
+    const v = known[f as keyof typeof known];
+    if (Array.isArray(v)) return v.length === 0;
+    if (typeof v === 'number') return v == null;
+    if (typeof v === 'string')
+      // The schema defaults; treat the literal default as "not yet asked"
+      return v === 'beginner' || v === 'adaptive' || v === 'default';
+    return v == null;
+  });
+
+  const result = await chatStructured({
+    promptKey: 'wise.onboarding',
+    purpose: 'wise.onboarding',
+    schema: OnboardingTurnSchema,
+    model: Models.fast,
+    temperature: 0.5,
+    maxOutputTokens: 600,
+    vars: {
+      KNOWN_JSON: JSON.stringify(known),
+      MISSING_FIELDS: JSON.stringify(missing),
+      TRANSCRIPT_JSON: JSON.stringify(transcript.slice(-10)),
+      LAST_USER_TURN: text,
+    },
+  });
+  const ai = result.data;
+
+  // Apply extracted profile updates (only what's present)
+  const updates: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(ai.extracted)) {
+    if (v === undefined || v === null) continue;
+    if (Array.isArray(v) && v.length === 0) continue;
+    updates[k] = v;
+  }
+  if (Object.keys(updates).length > 0) {
+    await updateProfile(userId, updates);
   }
 
-  transcript.push({ role: 'wise', text: wiseMessage });
-  await prisma.session.update({ where: { id: sessionId }, data: { transcript } });
+  transcript.push({ role: 'wise', text: ai.wiseMessage });
 
-  return { wiseMessage, extractedProfileUpdates, nextStep };
+  // Determine done state — both AI judgment AND a hard backstop:
+  // require at least goals + interests + currentLevel + sessionLength.
+  const refreshed = await prisma.learnerProfile.findUniqueOrThrow({ where: { userId } });
+  const hasMinimum =
+    refreshed.goals.length > 0 &&
+    refreshed.interests.length > 0 &&
+    refreshed.preferredSessionLengthMinutes != null;
+  const isComplete = ai.done && hasMinimum;
+
+  if (isComplete) {
+    await updateProfile(userId, { onboardingCompleted: true });
+    await prisma.session.update({
+      where: { id: sessionId },
+      data: { status: 'completed', transcript, completedAt: new Date() },
+    });
+    await emitUserEvent(userId, 'OnboardingCompleted', {
+      profileId: refreshed.id,
+      nativeLanguage: 'en',
+      targetLanguage: 'it',
+      level: refreshed.currentLevel as CEFRLevel,
+      goals: refreshed.goals,
+      interests: refreshed.interests,
+    });
+  } else {
+    await prisma.session.update({
+      where: { id: sessionId },
+      data: { transcript },
+    });
+  }
+
+  await emitUserEvent(userId, 'AICall', {
+    provider: 'openai',
+    model: result.usage.model,
+    purpose: 'wise.onboarding',
+    tokensIn: result.usage.promptTokens,
+    tokensOut: result.usage.completionTokens,
+    latencyMs: result.usage.latencyMs,
+    ok: true,
+  });
+
+  return {
+    wiseMessage: ai.wiseMessage,
+    extractedProfileUpdates: updates,
+    nextStep: isComplete ? 'complete' : 'continue',
+  };
 }
 
-function mapLevelText(text: string): CEFRLevel {
-  const t = text.toLowerCase();
-  if (t.includes('complete') || t.includes('zero') || t.includes('never')) return 'complete_beginner';
-  if (t.includes('advanc') || t.includes('fluent')) return 'advanced';
-  if (t.includes('upper')) return 'upper_intermediate';
-  if (t.includes('lower')) return 'lower_intermediate';
-  if (t.includes('intermediate')) return 'intermediate';
-  return 'beginner';
-}
-
-export async function placementAssess(userId: string, responses: string[], skillSlugs: string[]) {
+export async function placementAssess(
+  userId: string,
+  responses: string[],
+  skillSlugs: string[],
+) {
   const result = await chatStructured({
     promptKey: 'placement.assess',
     purpose: 'placement.assess',

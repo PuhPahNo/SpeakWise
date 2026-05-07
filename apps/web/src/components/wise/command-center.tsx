@@ -34,10 +34,15 @@ interface SummaryResponse {
   longestStreakDays: number;
 }
 
+interface ComebackResponse {
+  offer: { daysMissed: number; recommendedDurationMinutes: number; reason: string } | null;
+}
+
 export function CommandCenter({ firstName, sessionMinutes }: Props) {
   const router = useRouter();
   const [greeting, setGreeting] = useState<GreetingResponse | null>(null);
   const [summary, setSummary] = useState<SummaryResponse | null>(null);
+  const [comeback, setComeback] = useState<ComebackResponse['offer']>(null);
   const [wiseLine, setWiseLine] = useState<string>('');
   const [userLine, setUserLine] = useState<string>('');
   const [pending, setPending] = useState(false);
@@ -53,18 +58,20 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
     },
   });
 
-  // Boot: fetch greeting + summary in parallel; speak greeting once
+  // Boot: fetch greeting + summary + comeback in parallel; speak greeting once
   useEffect(() => {
     if (greetedRef.current) return;
     greetedRef.current = true;
     (async () => {
       try {
-        const [greetRes, summaryRes] = await Promise.all([
+        const [greetRes, summaryRes, comebackRes] = await Promise.all([
           fetch('/api/wise/greeting').then((r) => r.json() as Promise<GreetingResponse>),
           fetch('/api/gamification/summary').then((r) => r.json() as Promise<SummaryResponse>),
+          fetch('/api/gamification/comeback').then((r) => r.json() as Promise<ComebackResponse>),
         ]);
         setGreeting(greetRes);
         setSummary(summaryRes);
+        setComeback(comebackRes.offer);
         setWiseLine(greetRes.greeting);
         await tutor.speak(greetRes.greeting);
       } catch (e) {
@@ -73,6 +80,26 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function startComebackLesson() {
+    if (!comeback) return;
+    setPending(true);
+    try {
+      const gen = await fetch('/api/lessons/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lessonType: 'recovery',
+          durationMinutes: comeback.recommendedDurationMinutes,
+          userRequest: 'Easy comeback lesson — re-engage and rebuild momentum.',
+        }),
+      });
+      const out = await gen.json();
+      if (out.lesson?.id) router.push(`/lesson/${out.lesson.id}`);
+    } finally {
+      setPending(false);
+    }
+  }
 
   async function sendToWise(message: string) {
     setPending(true);
@@ -211,6 +238,24 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
       </div>
 
       <p className="text-xs text-ink-200 -mt-2">{statusText()}</p>
+
+      {comeback && (
+        <button
+          onClick={startComebackLesson}
+          disabled={pending}
+          className="w-full max-w-xl text-left rounded-2xl p-5 sm:p-6 surface border-wise-500/40 text-ink-50 hover:border-wise-500/70 transition disabled:opacity-60"
+        >
+          <div className="text-[11px] uppercase tracking-[0.2em] text-wise-400">Welcome back</div>
+          <div className="font-display text-lg sm:text-xl mt-2">
+            {comeback.daysMissed === 1
+              ? 'A short reset — pick up where you left off'
+              : `It's been ${comeback.daysMissed} days. Quick warm-up to ease back in.`}
+          </div>
+          <div className="text-sm mt-1 text-ink-200">
+            ~{comeback.recommendedDurationMinutes} min · low pressure, recent vocab
+          </div>
+        </button>
+      )}
 
       <div className="grid sm:grid-cols-2 gap-3 sm:gap-4 w-full max-w-xl">
         <button

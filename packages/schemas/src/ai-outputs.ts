@@ -141,16 +141,18 @@ export const MemoryExtractionOutputSchema = z.object({
 
 export const ProgressReportOutputSchema = z.object({
   summary: z.string(),
-  strengths: z.array(z.string()),
-  weaknesses: z.array(z.string()),
-  skillsMastered: z.array(z.string()),
-  skillsNeedingReview: z.array(z.string()),
-  vocabularySummary: z.object({
-    learning: z.number().int().min(0),
-    review: z.number().int().min(0),
-    mastered: z.number().int().min(0),
-  }),
-  recommendedNextSteps: z.array(z.string()),
+  strengths: z.array(z.string()).default([]),
+  weaknesses: z.array(z.string()).default([]),
+  skillsMastered: z.array(z.string()).default([]),
+  skillsNeedingReview: z.array(z.string()).default([]),
+  vocabularySummary: z
+    .object({
+      learning: z.number().int().min(0),
+      review: z.number().int().min(0),
+      mastered: z.number().int().min(0),
+    })
+    .default({ learning: 0, review: 0, mastered: 0 }),
+  recommendedNextSteps: z.array(z.string()).default([]),
 });
 
 export const PlacementAssessmentOutputSchema = z.object({
