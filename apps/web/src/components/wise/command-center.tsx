@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Flame, Sparkles } from 'lucide-react';
 import { VoiceOrb } from '@/components/voice/voice-orb';
 import { useVoiceTutor } from '@/hooks/use-voice-tutor';
+import { useToast } from '@/components/ui/toast';
 
 interface Props {
   firstName: string;
@@ -40,6 +41,7 @@ interface ComebackResponse {
 
 export function CommandCenter({ firstName, sessionMinutes }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const [greeting, setGreeting] = useState<GreetingResponse | null>(null);
   const [summary, setSummary] = useState<SummaryResponse | null>(null);
   const [comeback, setComeback] = useState<ComebackResponse['offer']>(null);
@@ -153,8 +155,19 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lessonType: 'daily_mission' }),
       });
+      if (!gen.ok) {
+        const errBody = await gen.json().catch(() => ({}));
+        toast.error(
+          'Couldn’t build that mission',
+          errBody.message ?? 'Try again in a moment.',
+        );
+        return;
+      }
       const out = await gen.json();
       if (out.lesson?.id) router.push(`/lesson/${out.lesson.id}`);
+    } catch (e) {
+      console.error('mission start failed', e);
+      toast.error('Network blip', 'Check your connection and try again.');
     } finally {
       setPending(false);
     }
@@ -263,21 +276,36 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
           disabled={pending}
           className="text-left rounded-2xl p-5 sm:p-6 bg-wise-500 hover:bg-wise-600 active:bg-wise-700 text-ink-900 transition disabled:opacity-60"
         >
-          <div className="text-[11px] uppercase tracking-[0.2em] opacity-80">Start now</div>
+          <div className="text-[11px] uppercase tracking-[0.2em] opacity-80">Inizia</div>
           <div className="font-display text-xl sm:text-2xl mt-2">Today&apos;s mission</div>
           <div className="text-sm mt-1 opacity-90">~{sessionMinutes} min</div>
         </button>
         <a
-          href="/vocabulary?dueForReview=true"
+          href="/vocabulary/review"
           className="text-left rounded-2xl p-5 sm:p-6 surface text-ink-50 hover:border-wise-500/40 transition"
         >
-          <div className="text-[11px] uppercase tracking-[0.2em] text-ink-200">Review</div>
+          <div className="text-[11px] uppercase tracking-[0.2em] text-ink-200">Ripasso</div>
           <div className="font-display text-xl sm:text-2xl mt-2">
             {dueCount > 0 ? `${dueCount} due` : 'All caught up'}
           </div>
           <div className="text-sm mt-1 text-ink-200">
-            {dueCount > 0 ? 'Quick wins for spaced repetition' : 'Come back tomorrow for more reviews'}
+            {dueCount > 0 ? 'Quick wins for spaced repetition' : 'Come back tomorrow'}
           </div>
+        </a>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 w-full max-w-xl text-sm">
+        <a
+          href="/talk"
+          className="text-center rounded-xl px-4 py-3 surface text-ink-100 hover:text-ink-50 hover:border-wise-500/40 transition"
+        >
+          Talk freely with Wise
+        </a>
+        <a
+          href="/lessons"
+          className="text-center rounded-xl px-4 py-3 surface text-ink-100 hover:text-ink-50 hover:border-wise-500/40 transition"
+        >
+          Past lessons
         </a>
       </div>
     </div>

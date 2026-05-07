@@ -11,11 +11,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <Link href="/command-center" className="font-display text-lg sm:text-xl text-ink-50">
           Speakwise
         </Link>
-        <nav className="hidden md:flex gap-7 text-sm text-ink-200">
-          <Link href="/command-center" className="hover:text-ink-50 transition">Home</Link>
-          <Link href="/vocabulary" className="hover:text-ink-50 transition">Vocabulary</Link>
-          <Link href="/progress" className="hover:text-ink-50 transition">Progress</Link>
-          <Link href="/profile" className="hover:text-ink-50 transition">Profile</Link>
+        <nav className="hidden md:flex gap-6 text-sm text-ink-200">
+          <Link href="/command-center" className="hover:text-ink-50 transition">Casa</Link>
+          <Link href="/talk" className="hover:text-ink-50 transition">Parla</Link>
+          <Link href="/lessons" className="hover:text-ink-50 transition">Lezioni</Link>
+          <Link href="/vocabulary" className="hover:text-ink-50 transition">Parole</Link>
+          <Link href="/progress" className="hover:text-ink-50 transition">Progressi</Link>
+          <Link href="/profile" className="hover:text-ink-50 transition">Profilo</Link>
         </nav>
         <UserMenu name={user.name} />
       </header>

@@ -35,6 +35,8 @@ export function VoiceOrb({
         return 'animate-orb-spin-slow';
       case 'speaking':
         return 'animate-orb-breathe';
+      case 'error':
+        return ''; // dim, no animation
       case 'awaiting_user_response':
       case 'idle':
       case 'paused':
@@ -43,21 +45,24 @@ export function VoiceOrb({
     }
   }, [state]);
 
+  const isError = state === 'error';
+
   // Dynamic outer glow scales with mic amplitude when listening
   const dynamicGlow =
     state === 'listening' ? Math.max(0, Math.min(1, amplitude)) : 0;
 
   return (
     <div className="relative inline-flex items-center justify-center">
-      {/* Outer halo rings — react to listening amplitude */}
+      {/* Outer halo rings — react to listening amplitude (or red on error) */}
       <div
         aria-hidden
         className="absolute inset-0 rounded-full transition-all duration-150"
         style={{
           transform: `scale(${1.15 + dynamicGlow * 0.25})`,
-          background:
-            'radial-gradient(circle, rgba(224,136,24,0.25), transparent 70%)',
-          opacity: state === 'listening' ? 0.7 + dynamicGlow * 0.3 : 0.3,
+          background: isError
+            ? 'radial-gradient(circle, rgba(220,38,38,0.30), transparent 70%)'
+            : 'radial-gradient(circle, rgba(224,136,24,0.25), transparent 70%)',
+          opacity: isError ? 0.6 : state === 'listening' ? 0.7 + dynamicGlow * 0.3 : 0.3,
         }}
       />
       <div
@@ -65,9 +70,10 @@ export function VoiceOrb({
         className="absolute inset-0 rounded-full"
         style={{
           transform: `scale(${1.35 + dynamicGlow * 0.4})`,
-          background:
-            'radial-gradient(circle, rgba(224,136,24,0.10), transparent 70%)',
-          opacity: state === 'listening' ? 0.6 : 0.2,
+          background: isError
+            ? 'radial-gradient(circle, rgba(220,38,38,0.12), transparent 70%)'
+            : 'radial-gradient(circle, rgba(224,136,24,0.10), transparent 70%)',
+          opacity: isError ? 0.4 : state === 'listening' ? 0.6 : 0.2,
           transition: 'all 200ms ease-out',
         }}
       />
@@ -80,10 +86,12 @@ export function VoiceOrb({
         aria-label={ariaLabel ?? `Voice orb, ${state.replace(/_/g, ' ')}`}
         className={`relative ${SIZE[size]} rounded-full ${animation} ${
           onTap ? 'cursor-pointer' : 'cursor-default'
-        } shadow-orb-glow focus:outline-none focus-visible:shadow-orb-glow-active`}
+        } ${isError ? '' : 'shadow-orb-glow'} focus:outline-none focus-visible:shadow-orb-glow-active transition-all duration-300`}
         style={{
-          background:
-            'radial-gradient(circle at 32% 28%, rgba(255,231,178,0.95), rgba(243,160,43,0.92) 38%, rgba(189,106,13,0.95) 70%, rgba(63,35,5,1) 100%)',
+          background: isError
+            ? 'radial-gradient(circle at 32% 28%, rgba(120,40,40,0.85), rgba(70,20,20,0.95) 60%, rgba(30,10,10,1) 100%)'
+            : 'radial-gradient(circle at 32% 28%, rgba(255,231,178,0.95), rgba(243,160,43,0.92) 38%, rgba(189,106,13,0.95) 70%, rgba(63,35,5,1) 100%)',
+          opacity: isError ? 0.7 : 1,
         }}
       >
         {/* Inner highlight */}

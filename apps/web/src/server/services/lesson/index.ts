@@ -164,6 +164,24 @@ export async function getLesson(userId: string, lessonId: string) {
   });
 }
 
+export async function listLessons(userId: string, opts?: { limit?: number }) {
+  return prisma.lesson.findMany({
+    where: { userId },
+    orderBy: [{ completedAt: 'desc' }, { createdAt: 'desc' }],
+    take: opts?.limit ?? 50,
+    select: {
+      id: true,
+      title: true,
+      lessonType: true,
+      status: true,
+      interestTheme: true,
+      estimatedDurationMinutes: true,
+      createdAt: true,
+      completedAt: true,
+    },
+  });
+}
+
 export async function startLessonSession(userId: string, lessonId: string, mode: 'voice' | 'text' | 'mixed') {
   const lesson = await getLesson(userId, lessonId);
   if (!lesson) throw new Error('Lesson not found');

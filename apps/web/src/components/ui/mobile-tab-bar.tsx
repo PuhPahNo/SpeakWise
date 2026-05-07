@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, BookOpen, BarChart3, User } from 'lucide-react';
+import { Home, BookOpen, MessageCircle, BarChart3, User } from 'lucide-react';
 
 const tabs = [
-  { href: '/command-center', label: 'Home', Icon: Home },
-  { href: '/vocabulary', label: 'Words', Icon: BookOpen },
-  { href: '/progress', label: 'Progress', Icon: BarChart3 },
-  { href: '/profile', label: 'Profile', Icon: User },
+  { href: '/command-center', label: 'Casa', Icon: Home },
+  { href: '/talk', label: 'Parla', Icon: MessageCircle },
+  { href: '/vocabulary', label: 'Parole', Icon: BookOpen },
+  { href: '/progress', label: 'Progressi', Icon: BarChart3 },
+  { href: '/profile', label: 'Profilo', Icon: User },
 ];
 
 export function MobileTabBar() {
@@ -19,7 +20,7 @@ export function MobileTabBar() {
       className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t hairline bg-ink-800/85 backdrop-blur supports-[backdrop-filter]:bg-ink-800/65"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <ul className="grid grid-cols-4">
+      <ul className="grid grid-cols-5">
         {tabs.map(({ href, label, Icon }) => {
           const active = pathname === href || pathname.startsWith(`${href}/`);
           return (
