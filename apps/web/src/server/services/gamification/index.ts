@@ -26,6 +26,34 @@ export async function getXpTotal(userId: string) {
   return result._sum.amount ?? 0;
 }
 
+export interface GamificationSummary {
+  xpTotal: number;
+  streakDays: number;
+  longestStreakDays: number;
+  lastActiveDate: string | null;
+}
+
+export async function getGamificationSummary(userId: string): Promise<GamificationSummary> {
+  const [xp, streak] = await Promise.all([
+    getXpTotal(userId),
+    prisma.userStreak.findUnique({ where: { userId } }),
+  ]);
+  return {
+    xpTotal: xp,
+    streakDays: streak?.currentDays ?? 0,
+    longestStreakDays: streak?.longestDays ?? 0,
+    lastActiveDate: streak?.lastActiveDate?.toISOString() ?? null,
+  };
+}
+
+export async function getXpEarnedSince(userId: string, since: Date): Promise<number> {
+  const result = await prisma.xpEntry.aggregate({
+    where: { userId, createdAt: { gte: since } },
+    _sum: { amount: true },
+  });
+  return result._sum.amount ?? 0;
+}
+
 export async function bumpStreak(userId: string) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);

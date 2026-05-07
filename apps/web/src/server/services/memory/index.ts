@@ -63,6 +63,55 @@ export async function listMemory(userId: string, opts?: { visibility?: 'user_vis
   });
 }
 
+const MEMORY_GROUPS = {
+  goals: ['goal', 'motivation'] as string[],
+  interests: ['interest', 'content_preference'] as string[],
+  strengths: ['strength'] as string[],
+  weaknesses: ['weakness', 'recurring_mistake', 'pronunciation_note'] as string[],
+  preferences: ['preference', 'correction_preference'] as string[],
+};
+
+export interface GroupedMemory {
+  groups: {
+    key: keyof typeof MEMORY_GROUPS;
+    label: string;
+    notes: Array<{ id: string; content: string; confidence: number; updatedAt: string }>;
+  }[];
+  totalActive: number;
+}
+
+const GROUP_LABELS: Record<keyof typeof MEMORY_GROUPS, string> = {
+  goals: 'Your goals',
+  interests: 'What you love',
+  strengths: 'Your strengths',
+  weaknesses: 'Where Wise is helping',
+  preferences: 'How you learn',
+};
+
+export async function listGroupedMemory(userId: string): Promise<GroupedMemory> {
+  const all = await prisma.memoryNote.findMany({
+    where: { userId, isActive: true, visibility: 'user_visible' },
+    orderBy: { updatedAt: 'desc' },
+  });
+
+  const groups = (Object.keys(MEMORY_GROUPS) as Array<keyof typeof MEMORY_GROUPS>).map(
+    (key) => {
+      const types = MEMORY_GROUPS[key];
+      const notes = all
+        .filter((n) => types.includes(n.type))
+        .map((n) => ({
+          id: n.id,
+          content: n.content,
+          confidence: Number(n.confidence),
+          updatedAt: n.updatedAt.toISOString(),
+        }));
+      return { key, label: GROUP_LABELS[key], notes };
+    },
+  );
+
+  return { groups, totalActive: all.length };
+}
+
 export async function retrieveRelevantMemories(userId: string, query: string, k = 5) {
   let queryEmbedding: number[] | null = null;
   try {

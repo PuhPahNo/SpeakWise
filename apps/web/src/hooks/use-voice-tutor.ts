@@ -10,6 +10,16 @@ interface Options {
   sttLanguage?: 'it' | 'en';
   /** Language hint for TTS playback. */
   ttsLanguage?: 'it' | 'en';
+  /**
+   * If true, after Wise finishes speaking we automatically begin listening
+   * for the user's reply. This is the Jarvis turn-taking pattern.
+   */
+  autoListenAfterSpeak?: boolean;
+}
+
+export interface SpeakOptions {
+  /** Override autoListenAfterSpeak for this single utterance. */
+  autoListenAfter?: boolean;
 }
 
 export interface VoiceTutor {
@@ -20,7 +30,9 @@ export interface VoiceTutor {
   /** Stop listening + transcribe what was captured. */
   stopAndTranscribe: () => Promise<void>;
   /** Speak a string out loud. Resolves when playback ends. */
-  speak: (text: string) => Promise<void>;
+  speak: (text: string, opts?: SpeakOptions) => Promise<void>;
+  /** Stop Wise mid-sentence (interruption). */
+  interrupt: () => void;
   /** Cancel anything in flight (TTS playback, recording). */
   cancel: () => void;
 }
@@ -181,11 +193,19 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
     }
   }, [state, startListening, stopAndTranscribe]);
 
+  const interrupt = useCallback(() => {
+    if (playerRef.current) {
+      playerRef.current.pause();
+      playerRef.current = null;
+    }
+    setState('idle');
+  }, []);
+
   // ── Speech synthesis playback ────────────────────────────────────────
   const speak = useCallback(
-    async (text: string) => {
+    async (text: string, speakOpts?: SpeakOptions) => {
       if (!text.trim()) return;
-      // Stop any in-flight player
+      // Stop any in-flight player (lets a new utterance interrupt the old)
       if (playerRef.current) {
         playerRef.current.pause();
         playerRef.current = null;
@@ -213,15 +233,37 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
           };
           audio.play().catch(() => resolve());
         });
-        if (playerRef.current === audio) playerRef.current = null;
+        const wasInterrupted = playerRef.current !== audio;
+        if (!wasInterrupted) playerRef.current = null;
+
+        const shouldAutoListen =
+          !wasInterrupted &&
+          (speakOpts?.autoListenAfter ?? opts.autoListenAfterSpeak ?? false);
+        if (shouldAutoListen) {
+          try {
+            await startListening();
+          } catch (e) {
+            console.error('voice tutor: auto-listen failed', e);
+            setState('awaiting_user_response');
+          }
+        } else if (!wasInterrupted) {
+          setState('awaiting_user_response');
+        }
       } catch (e) {
         console.error('voice tutor: TTS failed', e);
-      } finally {
         setState('awaiting_user_response');
       }
     },
-    [opts.ttsLanguage],
+    [opts.ttsLanguage, opts.autoListenAfterSpeak, startListening],
   );
 
-  return { state, amplitude, toggleListen, stopAndTranscribe, speak, cancel };
+  return {
+    state,
+    amplitude,
+    toggleListen,
+    stopAndTranscribe,
+    speak,
+    interrupt,
+    cancel,
+  };
 }
