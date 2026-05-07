@@ -39,12 +39,27 @@ export interface SpeakOptions {
 export interface VoiceTutor {
   state: VoiceState;
   amplitude: number;
+  /**
+   * True once the user has done at least one gesture that unlocked
+   * audio playback. Until then, speak() may be silently blocked by
+   * the browser's autoplay policy.
+   */
+  audioPrimed: boolean;
+  /**
+   * Call from a click/tap handler to unlock audio playback. Plays a
+   * silent buffer so subsequent .play() calls don't get rejected.
+   * Safe to call repeatedly.
+   */
+  primeAudio: () => Promise<void>;
   /** Toggle between idle and listening. */
   toggleListen: () => Promise<void>;
   /** Stop listening + transcribe what was captured. */
   stopAndTranscribe: () => Promise<void>;
-  /** Speak a string out loud. Resolves when playback ends. */
-  speak: (text: string, opts?: SpeakOptions) => Promise<void>;
+  /**
+   * Speak a string out loud. Resolves when playback ends OR when the
+   * browser refused to play. Returns whether audio actually started.
+   */
+  speak: (text: string, opts?: SpeakOptions) => Promise<boolean>;
   /** Stop Wise mid-sentence (interruption). */
   interrupt: () => void;
   /** Cancel anything in flight (TTS playback, recording). */
@@ -54,6 +69,7 @@ export interface VoiceTutor {
 export function useVoiceTutor(opts: Options): VoiceTutor {
   const [state, setState] = useState<VoiceState>('idle');
   const [amplitude, setAmplitude] = useState(0);
+  const [audioPrimed, setAudioPrimed] = useState(false);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -65,6 +81,28 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
   // Forward ref so the VAD loop in startListening can call stopAndTranscribe
   // without a circular dependency in useCallback ordering.
   const stopAndTranscribeRef = useRef<(() => Promise<void>) | null>(null);
+
+  // Single tiny silent WAV — playing it on the first user gesture unlocks
+  // the audio context for the rest of the session, so subsequent speak()
+  // calls don't get blocked by browsers' autoplay policy even when there's
+  // a long async gap (record → transcribe → LLM → TTS) before playback.
+  const SILENT_WAV =
+    'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+
+  const primeAudio = useCallback(async () => {
+    if (audioPrimed) return;
+    try {
+      const a = new Audio(SILENT_WAV);
+      a.volume = 0.01;
+      await a.play();
+      a.pause();
+      setAudioPrimed(true);
+    } catch (e) {
+      // If even the silent prime fails, the browser will keep blocking us;
+      // the consumer can retry on subsequent gestures.
+      console.warn('voice tutor: audio context prime rejected', e);
+    }
+  }, [audioPrimed]);
 
   const cleanupRecording = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -253,14 +291,15 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
 
   // ── Speech synthesis playback ────────────────────────────────────────
   const speak = useCallback(
-    async (text: string, speakOpts?: SpeakOptions) => {
-      if (!text.trim()) return;
+    async (text: string, speakOpts?: SpeakOptions): Promise<boolean> => {
+      if (!text.trim()) return false;
       // Stop any in-flight player (lets a new utterance interrupt the old)
       if (playerRef.current) {
         playerRef.current.pause();
         playerRef.current = null;
       }
       setState('speaking');
+      let played = false;
       try {
         const res = await fetch('/api/voice/speak', {
           method: 'POST',
@@ -281,12 +320,29 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
             URL.revokeObjectURL(url);
             resolve();
           };
-          audio.play().catch(() => resolve());
+          audio
+            .play()
+            .then(() => {
+              played = true;
+              // Mark primed if we successfully played — useful for
+              // consumers that want to know the audio context is unlocked.
+              setAudioPrimed(true);
+            })
+            .catch((err) => {
+              // Most common cause: autoplay policy. Surface it.
+              console.warn(
+                'voice tutor: audio.play() rejected (likely autoplay policy):',
+                err?.message ?? err,
+              );
+              URL.revokeObjectURL(url);
+              resolve();
+            });
         });
         const wasInterrupted = playerRef.current !== audio;
         if (!wasInterrupted) playerRef.current = null;
 
         const shouldAutoListen =
+          played &&
           !wasInterrupted &&
           (speakOpts?.autoListenAfter ?? opts.autoListenAfterSpeak ?? false);
         if (shouldAutoListen) {
@@ -303,6 +359,7 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
         console.error('voice tutor: TTS failed', e);
         setState('awaiting_user_response');
       }
+      return played;
     },
     [opts.ttsLanguage, opts.autoListenAfterSpeak, startListening],
   );
@@ -310,6 +367,8 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
   return {
     state,
     amplitude,
+    audioPrimed,
+    primeAudio,
     toggleListen,
     stopAndTranscribe,
     speak,

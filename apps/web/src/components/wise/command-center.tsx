@@ -60,7 +60,10 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
     },
   });
 
-  // Boot: fetch greeting + summary + comeback in parallel; speak greeting once
+  // Boot: fetch greeting + summary + comeback in parallel. We DISPLAY the
+  // greeting eagerly but do NOT auto-speak it — browser autoplay policy
+  // blocks audio without a user gesture. The first orb tap (or
+  // primeAndSpeak) plays the greeting and unlocks audio for the session.
   useEffect(() => {
     if (greetedRef.current) return;
     greetedRef.current = true;
@@ -75,13 +78,16 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
         setSummary(summaryRes);
         setComeback(comebackRes.offer);
         setWiseLine(greetRes.greeting);
-        await tutor.speak(greetRes.greeting);
       } catch (e) {
         console.error('command-center boot failed', e);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // True once the user has tapped the orb at least once. We use this to
+  // trigger the (greeting) speak from inside a real user gesture.
+  const [greetingPlayed, setGreetingPlayed] = useState(false);
 
   async function startComebackLesson() {
     if (!comeback) return;
@@ -174,11 +180,12 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
   }
 
   function statusText(): string {
+    if (greeting && !greetingPlayed) return 'Tap the orb to hear Wise';
     switch (tutor.state) {
       case 'speaking':
         return 'Wise is speaking — tap to interrupt';
       case 'listening':
-        return 'Listening — tap when you’re done';
+        return 'Listening — auto-stops on silence';
       case 'processing_transcription':
         return 'Got it…';
       case 'thinking':
@@ -188,7 +195,19 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
     }
   }
 
-  function onOrbTap() {
+  async function onOrbTap() {
+    // Always prime the audio context inside this gesture handler before
+    // any TTS — this unblocks playback for the whole session even when
+    // the actual `audio.play()` happens 2-3s later (after STT + LLM).
+    await tutor.primeAudio();
+
+    // First tap plays the greeting and turn-takes from there.
+    if (greeting && !greetingPlayed) {
+      setGreetingPlayed(true);
+      await tutor.speak(greeting.greeting);
+      return;
+    }
+
     if (tutor.state === 'speaking') {
       tutor.interrupt();
       void tutor.toggleListen();

@@ -11,7 +11,16 @@ test.describe('voice orb presence', () => {
   test('on /onboarding (interactive)', async ({ page, context, baseURL }) => {
     await authenticate(context, baseURL!);
     await page.goto('/onboarding');
-    const orb = page.locator('button[aria-label*="Voice orb" i], button[aria-label*="Tap to speak" i], button[aria-label*="Listen" i]');
+    // Onboarding can present the orb in any of these states.
+    const orb = page.locator(
+      [
+        'button[aria-label*="Voice orb" i]',
+        'button[aria-label*="Tap to speak" i]',
+        'button[aria-label*="Tap to begin" i]',
+        'button[aria-label*="Listen" i]',
+        'button[aria-label*="Interrupt" i]',
+      ].join(', '),
+    );
     await expect(orb.first()).toBeVisible();
   });
 
