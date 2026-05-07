@@ -9,6 +9,7 @@ dist/
 build/
 .turbo/
 *.tsbuildinfo
+next-env.d.ts
 
 # Mobile
 .expo/
