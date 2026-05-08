@@ -72,7 +72,11 @@ export async function generateLesson(input: GenerateLessonInput) {
 
   const request = {
     lessonType: input.lessonType,
-    durationMinutes: (input.durationMinutes ?? profile.level === 'complete_beginner') ? 8 : 12,
+    // Prefer the explicit duration; otherwise warm-up beginners with shorter
+    // lessons. The previous form had a precedence bug — the ?? was binding
+    // before the comparison and forcing a boolean → 8.
+    durationMinutes:
+      input.durationMinutes ?? (profile.level === 'complete_beginner' ? 8 : 12),
     interestTheme: input.interestTheme ?? null,
     userRequest: input.userRequest ?? null,
   };
@@ -83,7 +87,11 @@ export async function generateLesson(input: GenerateLessonInput) {
     schema: LessonGenerationOutputSchema,
     model: Models.reasoning,
     temperature: 0.7,
-    maxOutputTokens: 3500,
+    // 3500 was getting clipped mid-tasks for 8-12 minute lessons — the
+    // model returned a structurally-valid JSON without the tasks key
+    // because the response was forcibly closed. 6000 leaves enough headroom
+    // for ~6-8 detailed tasks plus the framing fields.
+    maxOutputTokens: 6000,
     vars: {
       CONTEXT_JSON: JSON.stringify(context),
       REQUEST_JSON: JSON.stringify(request),

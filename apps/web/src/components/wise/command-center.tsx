@@ -126,13 +126,25 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
       const data: WiseTurn = await res.json();
       setWiseLine(data.wiseMessage);
 
-      const startAction = data.actions.find((a) => a.type === 'START_LESSON' && a.lessonId);
+      // The model occasionally returns a START_LESSON with a skill slug or
+      // topic label as lessonId. Treat any non-UUID lessonId as an
+      // implicit GENERATE_LESSON instead — never push to /lesson/<garbage>.
+      const isUuid = (v: unknown): v is string =>
+        typeof v === 'string' &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+      const startAction = data.actions.find(
+        (a) => a.type === 'START_LESSON' && isUuid(a.lessonId),
+      );
       if (startAction?.lessonId) {
         await tutor.speak(data.wiseMessage, { autoListenAfter: false });
         router.push(`/lesson/${startAction.lessonId}`);
         return;
       }
-      const generateAction = data.actions.find((a) => a.type === 'GENERATE_LESSON');
+      const generateAction =
+        data.actions.find((a) => a.type === 'GENERATE_LESSON') ??
+        // Promote a START_LESSON-with-slug into GENERATE_LESSON so the
+        // conversation still leads somewhere useful.
+        data.actions.find((a) => a.type === 'START_LESSON' && !isUuid(a.lessonId));
       if (generateAction) {
         await tutor.speak(data.wiseMessage, { autoListenAfter: false });
         const gen = await fetch('/api/lessons/generate', {

@@ -39,7 +39,7 @@ export const promptTemplateSeed: SeedPromptTemplate[] = [
   },
   {
     key: 'wise.turn',
-    version: 2,
+    version: 3,
     purpose: 'Per-turn user-context wrapper for Wise conversational replies.',
     body: `${WISE_CORE_PERSONA}
 
@@ -52,9 +52,18 @@ reference them by name. Do NOT recite memory; just speak as someone who
 remembers. If the user message is short ("hi", "let's go"), respond in
 kind — don't lecture.
 
-When you propose a lesson, use action type GENERATE_LESSON; when you can
-identify an existing lessonId in context, use START_LESSON with that id.
-Use NONE if no action is needed.
+ACTIONS — choose ONE that fits the user's intent:
+- The user wants a NEW lesson on a topic ("learn vocab", "practice food",
+  "let's do a lesson"): use GENERATE_LESSON. Do NOT set lessonId.
+- The user wants to RESUME a specific existing lesson AND a UUID for it
+  is present in context.currentLessonId: use START_LESSON with that
+  EXACT UUID. Skill slugs (e.g. "it-vocab-food-restaurant") are NOT
+  lesson IDs and must never be passed as lessonId.
+- The user just chats / asks a grammar question / catches up: use NONE.
+- Open progress / vocab / profile views: OPEN_PROGRESS / OPEN_VOCAB /
+  OPEN_PROFILE.
+NEVER refuse a reasonable learning request — if you don't have a lesson
+to point to, propose GENERATE_LESSON instead of saying you can't.
 
 Memory extraction: only emit memoryCandidates when the user reveals
 something durable about themselves (a strong preference, a goal, a
@@ -175,7 +184,7 @@ Respond ONLY with valid JSON matching the schema:
   },
   {
     key: 'lesson.generate',
-    version: 2,
+    version: 3,
     purpose: 'Generate a structured, personalized lesson plan with tasks.',
     body: `You are the lesson generator for Speakwise. Produce a single Italian
 lesson appropriate for the learner's CEFR level, requested duration, and
@@ -204,8 +213,9 @@ TASK CURVE:
 
 PER-TASK REQUIREMENTS:
 - Every task must include skillTags drawn from targetSkills (use slugs).
-- multiple_choice: 3-4 plausible options, exactly one correct (set as
-  the value of expectedAnswer).
+- multiple_choice: provide 3-4 options as ARRAY OF OBJECTS in the
+  "options" field. Each option is { "value": "...", "label": "..." }.
+  expectedAnswer is the "value" of the correct option.
 - speaking_prompt / translation / roleplay: expectedAnswer is a sample
   natural answer in Italian (or null if open-ended).
 - fill_blank: prompt includes a literal "___" where the blank goes;
@@ -219,12 +229,40 @@ CONTEXT:
 REQUEST:
 {{REQUEST_JSON}}
 
-Respond ONLY with valid JSON matching the LessonGenerationOutput schema.`,
+Respond ONLY with valid JSON. The shape is FIXED — use these EXACT
+field names. Do NOT rename "title" to "lessonName" or "tasks" to
+"steps" or anything else. Schema:
+
+{
+  "title": "string (3-200 chars, the lesson name)",
+  "lessonType": one of [daily_mission, recovery, freestyle, grammar,
+    vocabulary_review, speaking_challenge, listening_challenge, media,
+    scenario_roleplay, progress_check, placement],
+  "estimatedDurationMinutes": integer 1-120,
+  "targetSkills": [array of skill slug strings, at least 1],
+  "interestTheme": "string or null",
+  "briefing": "string (10+ chars, the personal opening line)",
+  "tasks": [
+    {
+      "taskType": one of [briefing, explanation, multiple_choice, fill_blank,
+        translation, conjugation, pronoun_replacement, tense_selection,
+        error_correction, speaking_prompt, listening_comprehension,
+        roleplay, recap, media_clip, reflection],
+      "prompt": "string (1+ chars, what Wise will SAY out loud)",
+      "options": optional [ { "value": "string", "label": "string" } ],
+      "expectedAnswer": optional (string for most types, null for open-ended),
+      "explanation": optional "string",
+      "skillTags": ["array of skill slug strings"],
+      "vocabularyTargets": ["array of vocab strings"]
+    }
+  ],
+  "recapPlan": "string"
+}`,
     inputs: ['CONTEXT_JSON', 'REQUEST_JSON'],
   },
   {
     key: 'correction.evaluate',
-    version: 2,
+    version: 3,
     purpose: 'Grade a learner response and produce a structured, skill-targeted correction.',
     body: `You are the correction engine for Speakwise. You are speaking the
 correction OUT LOUD to the learner — write it the way you'd say it.
@@ -242,15 +280,6 @@ If skillNames are provided in the task, NAME the relevant skill in the
 explanation when relevant ("the past participle has to agree with the
 direct object pronoun here"). Don't be generic.
 
-ALWAYS provide:
-- score 0..1 reflecting accuracy
-- correctedAnswer in Italian (or echo their answer if already correct)
-- explanation in English; 1-2 spoken sentences max
-- mistakeType + severity + skillTags
-- encouragement: a short warm fragment ("Nice attempt!", "You're close.")
-- shouldUpdateMemory = true only when the mistake is recurring or the
-  response reveals a strong preference/strength/weakness worth remembering
-
 TASK:
 {{TASK_JSON}}
 
@@ -260,7 +289,20 @@ LEARNER ANSWER:
 CORRECTION MODE: {{CORRECTION_MODE}}
 LEARNER LEVEL: {{LEVEL}}
 
-Respond ONLY with valid JSON matching the CorrectionOutput schema.`,
+Respond ONLY with valid JSON. Use these EXACT field names:
+{
+  "isCorrect": boolean,
+  "score": number 0..1 (accuracy),
+  "encouragement": "short warm fragment, e.g. 'Nice attempt!'",
+  "correctedAnswer": "the right answer in Italian (or echo their answer if already correct)",
+  "explanation": "English; 1-2 spoken sentences max",
+  "mistakeType": one of [grammar, vocabulary, pronunciation, spelling,
+    word_order, tone, comprehension, fluency, other] OR null when isCorrect=true,
+  "severity": one of [minor, moderate, major] OR null when isCorrect=true,
+  "skillTags": [array of skill slug strings],
+  "retryPrompt": "string or null",
+  "shouldUpdateMemory": boolean
+}`,
     inputs: ['TASK_JSON', 'ANSWER', 'CORRECTION_MODE', 'LEVEL'],
   },
   {
@@ -285,7 +327,27 @@ SESSION TRANSCRIPT:
 USER PROFILE:
 {{PROFILE_JSON}}
 
-Respond ONLY with valid JSON matching the MemoryExtractionOutput schema.`,
+Respond ONLY with valid JSON. Use these EXACT field names:
+{
+  "memoryCandidates": [
+    {
+      "type": one of [preference, goal, interest, strength, weakness,
+        recurring_mistake, tutor_observation, motivation, content_preference,
+        correction_preference, pronunciation_note, session_summary],
+      "content": "string (3+ chars)",
+      "visibility": one of [user_visible, internal],
+      "confidence": number 0..1,
+      "structuredData": optional object
+    }
+  ],
+  "profileUpdates": object (may be empty {}),
+  "skillSignals": [
+    { "skillSlug": "string", "outcome": "correct" or "incorrect", "weight": 0..1 }
+  ],
+  "vocabularySignals": [
+    { "targetText": "string", "outcome": "correct" or "incorrect" }
+  ]
+}`,
     inputs: ['TRANSCRIPT_JSON', 'PROFILE_JSON'],
   },
   {
@@ -304,7 +366,14 @@ PLACEMENT RESPONSES:
 AVAILABLE SKILL SLUGS:
 {{SKILL_SLUGS}}
 
-Respond ONLY with valid JSON matching the PlacementAssessmentOutput schema.`,
+Respond ONLY with valid JSON. Use these EXACT field names:
+{
+  "estimatedLevel": one of [complete_beginner, beginner, lower_intermediate,
+    intermediate, upper_intermediate, advanced],
+  "confidence": number 0..1,
+  "reasoning": "string",
+  "suggestedFirstSkillSlugs": [array of skill slug strings]
+}`,
     inputs: ['RESPONSES_JSON', 'SKILL_SLUGS'],
   },
   {
@@ -320,7 +389,20 @@ on this week.
 DATA:
 {{REPORT_DATA_JSON}}
 
-Respond ONLY with valid JSON matching the ProgressReportOutput schema.`,
+Respond ONLY with valid JSON. Use these EXACT field names:
+{
+  "summary": "string",
+  "strengths": [array of strings],
+  "weaknesses": [array of strings],
+  "skillsMastered": [array of skill name strings],
+  "skillsNeedingReview": [array of skill name strings],
+  "vocabularySummary": {
+    "learning": integer ≥ 0,
+    "review": integer ≥ 0,
+    "mastered": integer ≥ 0
+  },
+  "recommendedNextSteps": [array of strings]
+}`,
     inputs: ['REPORT_DATA_JSON'],
   },
   {
@@ -334,7 +416,32 @@ recent vocabulary, and rebuilds momentum without judging the gap.
 CONTEXT:
 {{CONTEXT_JSON}}
 
-Respond ONLY with valid JSON matching the LessonGenerationOutput schema.`,
+Respond ONLY with valid JSON. The shape is FIXED — use these EXACT field
+names. Do NOT rename "title" to "lessonName" or "tasks" to "steps":
+
+{
+  "title": "string (3-200 chars)",
+  "lessonType": "recovery",
+  "estimatedDurationMinutes": integer 1-120,
+  "targetSkills": [array of skill slug strings, at least 1],
+  "interestTheme": "string or null",
+  "briefing": "string (10+ chars, warm low-friction opening)",
+  "tasks": [
+    {
+      "taskType": one of [briefing, explanation, multiple_choice, fill_blank,
+        translation, conjugation, pronoun_replacement, tense_selection,
+        error_correction, speaking_prompt, listening_comprehension,
+        roleplay, recap, media_clip, reflection],
+      "prompt": "string",
+      "options": optional [ { "value": "string", "label": "string" } ],
+      "expectedAnswer": optional,
+      "explanation": optional "string",
+      "skillTags": ["array of skill slug strings"],
+      "vocabularyTargets": ["array of vocab strings"]
+    }
+  ],
+  "recapPlan": "string"
+}`,
     inputs: ['CONTEXT_JSON', 'DAYS_MISSED', 'DURATION_MINUTES'],
   },
 ];

@@ -89,11 +89,18 @@ export const LessonGenerationOutputSchema = z.object({
       z.object({
         taskType: TaskTypeEnum,
         prompt: z.string().min(1),
-        options: z.array(MultipleChoiceOptionSchema).optional(),
+        // The model often returns options as plain strings instead of
+        // {value,label} pairs, so accept both shapes and normalize at
+        // call sites. Same with expectedAnswer — accept anything.
+        options: z
+          .union([z.array(MultipleChoiceOptionSchema), z.array(z.string())])
+          .optional(),
         expectedAnswer: z.unknown().optional(),
         explanation: z.string().optional(),
-        skillTags: z.array(z.string()),
-        vocabularyTargets: z.array(z.string()),
+        skillTags: z.array(z.string()).default([]),
+        // Models sometimes omit empty arrays — default to [] to be lenient
+        // rather than reject the whole lesson.
+        vocabularyTargets: z.array(z.string()).default([]),
       }),
     )
     .min(1),
@@ -106,8 +113,11 @@ export const CorrectionOutputSchema = z.object({
   encouragement: z.string(),
   correctedAnswer: z.string(),
   explanation: z.string(),
-  mistakeType: CorrectionTypeEnum,
-  severity: CorrectionSeverityEnum,
+  // mistakeType and severity are nullable: when isCorrect=true there is no
+  // mistake, so the model is told to return null for both. Forcing an enum
+  // here would make every successful answer fail validation.
+  mistakeType: CorrectionTypeEnum.nullable(),
+  severity: CorrectionSeverityEnum.nullable(),
   skillTags: z.array(z.string()),
   retryPrompt: z.string().nullable(),
   shouldUpdateMemory: z.boolean(),
@@ -187,7 +197,12 @@ export const WiseActionSchema = z.object({
     'OPEN_VOCAB',
     'NONE',
   ]),
-  lessonId: z.string().uuid().optional(),
+  // Accept any string, null, or absent. Models often hand back skill slugs
+  // or topic labels instead of UUIDs (or null when there's no specific
+  // lesson); rejecting the whole turn over that is far worse than letting
+  // the call site filter and decide whether to promote to GENERATE_LESSON
+  // or drop the action.
+  lessonId: z.string().nullable().optional(),
   payload: z.record(z.unknown()).optional(),
 });
 

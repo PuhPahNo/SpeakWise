@@ -58,6 +58,32 @@ describe('LessonGenerationOutputSchema', () => {
     expect(r1.success).toBe(false);
     expect(r2.success).toBe(false);
   });
+
+  // Regression: gpt-4o sometimes ships tasks without `vocabularyTargets`.
+  // We default that to [] rather than failing the whole lesson.
+  it('defaults missing vocabularyTargets to []', () => {
+    const taskNoVocab = {
+      taskType: 'roleplay',
+      prompt: 'Order at a trattoria.',
+      expectedAnswer: null,
+      skillTags: ['it-essere-present'],
+      // vocabularyTargets intentionally omitted
+    };
+    const r = LessonGenerationOutputSchema.safeParse({ ...valid, tasks: [taskNoVocab] });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.tasks[0]?.vocabularyTargets).toEqual([]);
+  });
+
+  // Regression: gpt-4o occasionally returns plain string options for
+  // multiple_choice ("a", "b", ...). We accept either shape.
+  it('accepts either plain-string or object options', () => {
+    const taskStringOpts = {
+      ...valid.tasks[0],
+      options: ['Voglio', 'Vorrei'],
+    };
+    const r = LessonGenerationOutputSchema.safeParse({ ...valid, tasks: [taskStringOpts] });
+    expect(r.success).toBe(true);
+  });
 });
 
 describe('CorrectionOutputSchema', () => {
@@ -74,6 +100,25 @@ describe('CorrectionOutputSchema', () => {
       skillTags: ['it-passato-prossimo-avere'],
       retryPrompt: null,
       shouldUpdateMemory: true,
+    });
+    expect(r.success).toBe(true);
+  });
+
+  // Regression: when isCorrect=true the model returns null for both
+  // mistakeType and severity. Forcing the enum forced every successful
+  // answer to 502.
+  it('accepts null mistakeType + severity on correct answers', () => {
+    const r = CorrectionOutputSchema.safeParse({
+      isCorrect: true,
+      score: 1,
+      encouragement: 'Nice!',
+      correctedAnswer: 'Vorrei una pasta',
+      explanation: 'Right verb form.',
+      mistakeType: null,
+      severity: null,
+      skillTags: ['it-essere-present'],
+      retryPrompt: null,
+      shouldUpdateMemory: false,
     });
     expect(r.success).toBe(true);
   });
@@ -114,6 +159,22 @@ describe('WiseTurnOutputSchema', () => {
       memoryCandidates: [],
     });
     expect(r.success).toBe(false);
+  });
+
+  // Regression: Wise was returning skill slugs (or null) as lessonId for
+  // START_LESSON actions, which forced "Invalid uuid" errors and made
+  // every learning request 502 → the user saw "Wise is unable to do that".
+  // Accept slugs/null at the schema level; the call site filters.
+  it('accepts non-UUID lessonId (slug, null, omitted)', () => {
+    for (const lessonId of ['it-vocab-food-restaurant', null, undefined]) {
+      const r = WiseTurnOutputSchema.safeParse({
+        intent: 'start_lesson',
+        wiseMessage: "Let's go.",
+        actions: [{ type: 'START_LESSON', lessonId }],
+        memoryCandidates: [],
+      });
+      expect(r.success).toBe(true);
+    }
   });
 });
 

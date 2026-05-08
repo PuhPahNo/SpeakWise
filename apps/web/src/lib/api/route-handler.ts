@@ -47,7 +47,12 @@ function errorResponse(err: unknown) {
     return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
   }
   if (err instanceof AISchemaValidationError) {
-    console.error('AI schema validation error', err.issues, err.raw.slice(0, 500));
+    // Log the full raw and full issues — truncating either makes it
+    // impossible to debug schema regressions in dev.
+    console.error('AI schema validation error');
+    console.error('  purpose:', err.purpose);
+    console.error('  issues:', JSON.stringify(err.issues, null, 2));
+    console.error('  raw (full):', err.raw);
     return NextResponse.json(
       { error: 'ai_output_invalid', message: err.message, purpose: err.purpose },
       { status: 502 },

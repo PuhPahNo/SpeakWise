@@ -69,11 +69,15 @@ export async function evaluateUserResponse({
   });
   const ai = result.data;
 
+  // When the answer is correct, the model returns null for mistakeType /
+  // severity (no mistake to classify). The Correction row still anchors
+  // the explanation + encouragement we want to surface, so default the
+  // non-nullable Prisma fields to harmless values for correct answers.
   const correction = await prisma.correction.create({
     data: {
       userResponseId: ur.id,
-      correctionType: ai.mistakeType,
-      severity: ai.severity,
+      correctionType: ai.mistakeType ?? 'other',
+      severity: ai.severity ?? 'minor',
       originalText: ur.userAnswer,
       correctedText: ai.correctedAnswer,
       explanation: ai.explanation,
@@ -104,12 +108,15 @@ export async function evaluateUserResponse({
   });
 
   if (!ai.isCorrect) {
+    // When the answer is wrong the model fills both, but defend against the
+    // edge case where it returns null while flagging incorrect (the event
+    // schema does not allow null).
     await emitUserEvent(userId, 'MistakeDetected', {
       userResponseId: ur.id,
       correctionId: correction.id,
       skillIds: ur.lessonTask?.targetSkillIds ?? [],
-      severity: ai.severity,
-      mistakeType: ai.mistakeType,
+      severity: ai.severity ?? 'minor',
+      mistakeType: ai.mistakeType ?? 'other',
     });
   }
 
