@@ -27,6 +27,38 @@ export default function OnboardingPage() {
     },
   });
 
+  // Pre-warm the slow routes on mount so the user's first orb tap doesn't
+  // wait for cold compilation. We fire /api/onboarding/start once
+  // immediately — its response is cached in `prewarmedStart` and reused
+  // by begin(). We also do a HEAD on /api/voice/speak to compile that
+  // handler. By the time the user reads the intro and taps, both routes
+  // are warm + the session is created.
+  const prewarmedStartRef = useRef<{ sessionId: string; wiseMessage: string } | null>(null);
+  const prewarmStartedRef = useRef(false);
+  useEffect(() => {
+    if (prewarmStartedRef.current) return;
+    prewarmStartedRef.current = true;
+    void (async () => {
+      // Hit the onboarding session endpoint upfront so /api/onboarding/start
+      // is compiled and a session is created before the user taps.
+      try {
+        const res = await fetch('/api/onboarding/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'voice' }),
+        });
+        if (res.ok) {
+          prewarmedStartRef.current = (await res.json()) as {
+            sessionId: string;
+            wiseMessage: string;
+          };
+        }
+      } catch {
+        /* non-fatal — begin() will fetch fresh */
+      }
+    })();
+  }, []);
+
   // Begin: fires from a real user gesture (orb tap), so audio is unlocked.
   async function begin() {
     if (beginningRef.current) return;
@@ -34,17 +66,22 @@ export default function OnboardingPage() {
     setPending(true);
     try {
       // Unlock the audio context with this user gesture before any TTS.
+      // Use the pre-warmed session if mount finished, else fetch fresh.
+      let startData: { sessionId: string; wiseMessage: string } | null = prewarmedStartRef.current;
+      if (!startData) {
+        const res = await fetch('/api/onboarding/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'voice' }),
+        });
+        startData = (await res.json()) as { sessionId: string; wiseMessage: string };
+      }
       await tutor.primeAudio();
-      const res = await fetch('/api/onboarding/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'voice' }),
-      });
-      const data = (await res.json()) as { sessionId: string; wiseMessage: string };
-      setSessionId(data.sessionId);
-      setWiseLine(data.wiseMessage);
+
+      setSessionId(startData.sessionId);
+      setWiseLine(startData.wiseMessage);
       setPhase('conversing');
-      await tutor.speak(data.wiseMessage);
+      await tutor.speak(startData.wiseMessage);
     } catch (e) {
       console.error('onboarding start failed', e);
       beginningRef.current = false;
@@ -79,7 +116,10 @@ export default function OnboardingPage() {
 
   function statusText(): string {
     if (phase === 'done') return "All set — let's go.";
-    if (phase === 'intro') return 'Tap the orb to begin';
+    if (phase === 'intro') {
+      return pending ? 'Wise is warming up…' : 'Tap the orb to begin';
+    }
+    if (pending) return 'Wise is thinking…';
     switch (tutor.state) {
       case 'speaking':
         return 'Wise is speaking… (tap to interrupt)';
@@ -88,7 +128,7 @@ export default function OnboardingPage() {
       case 'processing_transcription':
         return 'Got it — transcribing…';
       case 'thinking':
-        return 'Thinking…';
+        return 'Wise is thinking…';
       case 'awaiting_user_response':
         return 'Tap the orb to reply';
       case 'error':
@@ -142,7 +182,10 @@ export default function OnboardingPage() {
 
       <div className="flex flex-col items-center gap-8 sm:gap-10 my-8 sm:my-12">
         <VoiceOrb
-          state={tutor.state}
+          // Show the spinning "thinking" state any time we're loading
+          // something on the user's behalf, so they get immediate
+          // feedback after their tap.
+          state={pending ? 'thinking' : tutor.state}
           size="xl"
           amplitude={tutor.amplitude}
           onTap={onOrbTap}

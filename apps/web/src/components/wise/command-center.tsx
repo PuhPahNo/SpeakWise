@@ -85,8 +85,10 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // True once the user has tapped the orb at least once. We use this to
-  // trigger the (greeting) speak from inside a real user gesture.
+  // True once the user has tapped the orb. Ref so rapid double-taps see
+  // the same value synchronously (state updates are async and would let
+  // a second tap fire speak() again before the first finished).
+  const greetingPlayedRef = useRef(false);
   const [greetingPlayed, setGreetingPlayed] = useState(false);
 
   async function startComebackLesson() {
@@ -193,18 +195,20 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
   }
 
   async function onOrbTap() {
-    // Always prime the audio context inside this gesture handler before
-    // any TTS — this unblocks playback for the whole session even when
-    // the actual `audio.play()` happens 2-3s later (after STT + LLM).
-    await tutor.primeAudio();
-
-    // First tap plays the greeting and turn-takes from there.
-    if (greeting && !greetingPlayed) {
+    // First tap plays the greeting and turn-takes from there. Ref-gate
+    // is synchronous — a rapid double-tap sees `true` on the second
+    // call and falls through, instead of firing speak() twice.
+    if (greeting && !greetingPlayedRef.current) {
+      greetingPlayedRef.current = true;
       setGreetingPlayed(true);
+      // primeAudio MUST run inside this gesture handler before the TTS
+      // fetch resolves — that unlocks the audio context for the session.
+      await tutor.primeAudio();
       await tutor.speak(greeting.greeting);
       return;
     }
 
+    // Subsequent taps: prime is already done, normal flow.
     if (tutor.state === 'speaking') {
       tutor.interrupt();
       void tutor.toggleListen();
@@ -241,7 +245,14 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
         Welcome back, {firstName}.
       </h1>
 
-      <VoiceOrb state={tutor.state} size="lg" amplitude={tutor.amplitude} onTap={onOrbTap} />
+      <VoiceOrb
+        // Show thinking state during pending background work so the user
+        // sees movement immediately on tap, not a static orb.
+        state={pending ? 'thinking' : tutor.state}
+        size="lg"
+        amplitude={tutor.amplitude}
+        onTap={onOrbTap}
+      />
 
       <div className="text-center min-h-[5rem] max-w-xl">
         {wiseLine ? (

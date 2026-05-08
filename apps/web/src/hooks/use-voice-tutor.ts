@@ -81,6 +81,12 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
   // Forward ref so the VAD loop in startListening can call stopAndTranscribe
   // without a circular dependency in useCallback ordering.
   const stopAndTranscribeRef = useRef<(() => Promise<void>) | null>(null);
+  // Monotonic counter — each speak() call gets an ID; if a newer speak()
+  // starts mid-flight, older ones bail out cleanly so we never overlap.
+  const speakIdRef = useRef(0);
+  // AbortController for the in-flight TTS fetch so we can cancel network
+  // work when superseded.
+  const ttsAbortRef = useRef<AbortController | null>(null);
 
   // Single tiny silent WAV — playing it on the first user gesture unlocks
   // the audio context for the rest of the session, so subsequent speak()
@@ -294,24 +300,40 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
   const speak = useCallback(
     async (text: string, speakOpts?: SpeakOptions): Promise<boolean> => {
       if (!text.trim()) return false;
-      // Stop any in-flight player (lets a new utterance interrupt the old)
+      // Bump the ID — any older in-flight speak() will see its ID is stale
+      // and bail. This is what kills double-tap echoes.
+      const myId = ++speakIdRef.current;
+      // Cancel any in-flight TTS fetch from a previous speak()
+      ttsAbortRef.current?.abort();
+      // Stop any currently playing audio
       if (playerRef.current) {
         playerRef.current.pause();
         playerRef.current = null;
       }
-      setState('speaking');
+      // Show the spinning "thinking" state while we wait for TTS to come
+      // back — gives the user immediate visual feedback that something
+      // is happening, instead of an idle orb during a 1-3s round-trip.
+      setState('thinking');
       let played = false;
+      const abort = new AbortController();
+      ttsAbortRef.current = abort;
       try {
         const res = await fetch('/api/voice/speak', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text, language: opts.ttsLanguage ?? 'en' }),
+          signal: abort.signal,
         });
+        // If a newer speak() came along, drop this one quietly.
+        if (myId !== speakIdRef.current) return false;
         if (!res.ok) throw new Error(`tts failed: ${res.status}`);
         const blob = await res.blob();
+        if (myId !== speakIdRef.current) return false;
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
         playerRef.current = audio;
+        // Now actually playing — switch to the breathing 'speaking' state.
+        setState('speaking');
         await new Promise<void>((resolve) => {
           audio.onended = () => {
             URL.revokeObjectURL(url);
@@ -339,7 +361,7 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
               resolve();
             });
         });
-        const wasInterrupted = playerRef.current !== audio;
+        const wasInterrupted = playerRef.current !== audio || myId !== speakIdRef.current;
         if (!wasInterrupted) playerRef.current = null;
 
         const shouldAutoListen =
@@ -357,8 +379,12 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
           setState('awaiting_user_response');
         }
       } catch (e) {
+        // AbortError on supersession is expected — drop quietly.
+        if ((e as { name?: string })?.name === 'AbortError') return false;
         console.error('voice tutor: TTS failed', e);
         setState('awaiting_user_response');
+      } finally {
+        if (ttsAbortRef.current === abort) ttsAbortRef.current = null;
       }
       return played;
     },
