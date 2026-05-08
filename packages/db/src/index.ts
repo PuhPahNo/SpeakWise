@@ -15,7 +15,7 @@ if (process.env.NODE_ENV !== 'production') {
   global.__speakwisePrisma = prisma;
 }
 
-export type { Prisma } from '@prisma/client';
+export { Prisma } from '@prisma/client';
 export {
   UserRole,
   CEFRLevel,

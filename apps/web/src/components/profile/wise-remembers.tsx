@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 interface Note {
   id: string;
@@ -62,9 +62,9 @@ export function WiseRemembers() {
   if (data.totalActive === 0) {
     return (
       <p className="text-sm text-ink-200 max-w-prose">
-        Wise hasn&apos;t learned much about you yet. After a few sessions,
-        what stands out about your goals, strengths, and preferences will
-        show up here. You can always edit or remove anything Wise remembers.
+        Wise hasn&apos;t learned much about you yet. After a few sessions, what stands out about
+        your goals, strengths, and preferences will show up here. You can always edit or remove
+        anything Wise remembers.
       </p>
     );
   }
@@ -75,9 +75,7 @@ export function WiseRemembers() {
         .filter((g) => g.notes.length > 0)
         .map((g) => (
           <section key={g.key}>
-            <h3 className="font-display text-base text-ink-100 mb-2 tracking-tight">
-              {g.label}
-            </h3>
+            <h3 className="font-display text-base text-ink-100 mb-2 tracking-tight">{g.label}</h3>
             <ul className="space-y-2">
               {g.notes.map((n) => (
                 <li

@@ -1,4 +1,4 @@
-import { prisma, type SkillStatus } from '@speakwise/db';
+import { type SkillStatus, prisma } from '@speakwise/db';
 import { emitUserEvent } from '@speakwise/events';
 
 interface RecordResultOpts {
@@ -43,7 +43,7 @@ export async function recordSkillEvidence({
 
   // Spaced review window
   const reviewDays = correct
-    ? NEXT_REVIEW_DAYS_CORRECT[Math.min(correctCount, NEXT_REVIEW_DAYS_CORRECT.length - 1)] ?? 30
+    ? (NEXT_REVIEW_DAYS_CORRECT[Math.min(correctCount, NEXT_REVIEW_DAYS_CORRECT.length - 1)] ?? 30)
     : 1;
   const nextReviewAt = new Date(Date.now() + reviewDays * 24 * 60 * 60 * 1000);
 

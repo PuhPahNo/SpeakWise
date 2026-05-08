@@ -1,7 +1,7 @@
+import { VoiceOrb } from '@/components/voice/voice-orb';
+import { readSession } from '@/lib/auth/session';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { readSession } from '@/lib/auth/session';
-import { VoiceOrb } from '@/components/voice/voice-orb';
 
 export default async function HomePage() {
   const session = await readSession();
@@ -18,8 +18,8 @@ export default async function HomePage() {
           <em className="text-wise-400 font-display italic">remembers you</em>.
         </h1>
         <p className="mt-6 text-base sm:text-lg text-ink-200 max-w-xl mx-auto">
-          Wise turns your goals, interests, mistakes, and progress into personalized
-          voice-first lessons.
+          Wise turns your goals, interests, mistakes, and progress into personalized voice-first
+          lessons.
         </p>
         <div className="mt-10">
           <Link

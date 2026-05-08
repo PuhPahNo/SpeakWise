@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server';
-import { z } from 'zod';
-import { synthesizeSpeech } from '@speakwise/ai';
 import { getOrCreateUser } from '@/lib/auth/current-user';
 import { ensureProfile } from '@/server/services/profile';
+import { synthesizeSpeech } from '@speakwise/ai';
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
 
 const Schema = z.object({
   text: z.string().min(1).max(2000),

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 test('sign-in form happy path lands on app shell', async ({ page }) => {
   await page.goto('/sign-in');
@@ -35,5 +35,5 @@ test('sign-in input text is readable (foreground != white-on-white)', async ({ p
   // Inputs in our dark theme: bg should not be white, OR color should be readable.
   expect(styles.color).not.toBe(styles.bg);
   // Font size 16+ on phones (we use ≥16px to prevent iOS auto-zoom).
-  expect(parseFloat(styles.fontSize)).toBeGreaterThanOrEqual(15.99);
+  expect(Number.parseFloat(styles.fontSize)).toBeGreaterThanOrEqual(15.99);
 });

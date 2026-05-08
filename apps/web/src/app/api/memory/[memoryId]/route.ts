@@ -1,6 +1,6 @@
 import { withAuthAndJson } from '@/lib/api/route-handler';
-import { z } from 'zod';
 import { prisma } from '@speakwise/db';
+import { z } from 'zod';
 
 const Schema = z.object({ isActive: z.boolean().optional(), content: z.string().optional() });
 

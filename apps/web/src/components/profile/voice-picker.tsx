@@ -1,7 +1,7 @@
 'use client';
 
+import { Check, Pause, Play } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { Play, Pause, Check } from 'lucide-react';
 
 interface Voice {
   id: string;

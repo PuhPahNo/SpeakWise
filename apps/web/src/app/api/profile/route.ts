@@ -1,6 +1,6 @@
 import { withAuth, withAuthAndJson } from '@/lib/api/route-handler';
-import { PatchProfileRequestSchema } from '@speakwise/schemas';
 import { ensureProfile, updateProfile } from '@/server/services/profile';
+import { PatchProfileRequestSchema } from '@speakwise/schemas';
 
 export async function GET() {
   return withAuth(async ({ userId }) => ensureProfile(userId));

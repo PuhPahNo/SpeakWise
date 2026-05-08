@@ -1,7 +1,7 @@
-import { getOrCreateUser } from '@/lib/auth/current-user';
-import { ensureProfile } from '@/server/services/profile';
 import { ProfileEditor } from '@/components/profile/profile-editor';
 import { WiseRemembers } from '@/components/profile/wise-remembers';
+import { getOrCreateUser } from '@/lib/auth/current-user';
+import { ensureProfile } from '@/server/services/profile';
 
 export default async function ProfilePage() {
   const user = await getOrCreateUser();

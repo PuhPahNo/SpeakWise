@@ -1,4 +1,4 @@
-import type { Page, BrowserContext, ConsoleMessage } from '@playwright/test';
+import type { BrowserContext, ConsoleMessage, Page } from '@playwright/test';
 
 const TEST_USERNAME = process.env.TEST_USERNAME ?? 'anthony';
 const TEST_PASSWORD = process.env.TEST_PASSWORD ?? 'admin123';

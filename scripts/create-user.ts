@@ -13,8 +13,8 @@
  */
 
 import { randomBytes } from 'node:crypto';
-import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 interface Args {
   username: string;
@@ -42,7 +42,9 @@ function parseArgs(): Args {
   }
   const [username, password] = positional;
   if (!username) {
-    console.error('usage: create-user.ts <username> [password] [--admin] [--name "..."] [--email "..."]');
+    console.error(
+      'usage: create-user.ts <username> [password] [--admin] [--name "..."] [--email "..."]',
+    );
     process.exit(2);
   }
   return { username, password, name, email, admin };

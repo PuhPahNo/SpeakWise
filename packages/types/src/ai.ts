@@ -1,7 +1,7 @@
-import type { CEFRLevel } from './primitives';
 import type { CorrectionSeverity, CorrectionType } from './correction';
 import type { LessonType, TaskType } from './lesson';
 import type { MemoryType, MemoryVisibility } from './memory';
+import type { CEFRLevel } from './primitives';
 
 export interface LessonGenerationOutput {
   title: string;

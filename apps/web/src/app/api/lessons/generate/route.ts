@@ -1,6 +1,6 @@
 import { withAuthAndJson } from '@/lib/api/route-handler';
-import { GenerateLessonRequestSchema } from '@speakwise/schemas';
 import { generateLesson } from '@/server/services/lesson';
+import { GenerateLessonRequestSchema } from '@speakwise/schemas';
 
 export async function POST(req: Request) {
   return withAuthAndJson(GenerateLessonRequestSchema, req, async ({ userId }, body) => {

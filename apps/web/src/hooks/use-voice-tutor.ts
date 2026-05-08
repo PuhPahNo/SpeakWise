@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
 import type { VoiceState } from '@speakwise/types';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface Options {
   /** Called with the user's transcribed speech once they finish recording. */
@@ -113,7 +113,7 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
       audioCtxRef.current.close().catch(() => {});
     }
     audioCtxRef.current = null;
-    streamRef.current?.getTracks().forEach((t) => t.stop());
+    for (const t of streamRef.current?.getTracks() ?? []) t.stop();
     streamRef.current = null;
     recorderRef.current = null;
     setAmplitude(0);
@@ -121,7 +121,9 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
 
   const cancel = useCallback(() => {
     if (recorderRef.current && recorderRef.current.state !== 'inactive') {
-      try { recorderRef.current.stop(); } catch {}
+      try {
+        recorderRef.current.stop();
+      } catch {}
     }
     cleanupRecording();
     if (playerRef.current) {
@@ -154,8 +156,7 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
 
     const AudioCtx =
       window.AudioContext ||
-      (window as unknown as { webkitAudioContext: typeof AudioContext })
-        .webkitAudioContext;
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     const ctx = new AudioCtx();
     audioCtxRef.current = ctx;
     const source = ctx.createMediaStreamSource(stream);
@@ -204,18 +205,14 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
     tick();
 
     chunksRef.current = [];
-    const mime =
-      MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/mp4')
-          ? 'audio/mp4'
-          : '';
-    const recorder = new MediaRecorder(
-      stream,
-      mime ? { mimeType: mime } : undefined,
-    );
+    const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus'
+      : MediaRecorder.isTypeSupported('audio/mp4')
+        ? 'audio/mp4'
+        : '';
+    const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
     recorder.ondataavailable = (e) => {
-      if (e.data && e.data.size) chunksRef.current.push(e.data);
+      if (e.data?.size) chunksRef.current.push(e.data);
     };
     recorder.start();
     recorderRef.current = recorder;
@@ -229,7 +226,11 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
     setState('processing_transcription');
     const stoppedChunks: Blob[] = await new Promise((resolve) => {
       recorder.onstop = () => resolve(chunksRef.current);
-      try { recorder.stop(); } catch { resolve(chunksRef.current); }
+      try {
+        recorder.stop();
+      } catch {
+        resolve(chunksRef.current);
+      }
     });
     cleanupRecording();
 

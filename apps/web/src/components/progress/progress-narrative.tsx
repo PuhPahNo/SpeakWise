@@ -29,7 +29,8 @@ export function ProgressNarrative() {
   if (error) {
     return (
       <p className="text-sm text-ink-200 italic">
-        Wise needs a session or two before there&apos;s much to say. Come back after your first lesson.
+        Wise needs a session or two before there&apos;s much to say. Come back after your first
+        lesson.
       </p>
     );
   }
@@ -45,15 +46,11 @@ export function ProgressNarrative() {
 
   return (
     <div className="surface rounded-2xl p-5 sm:p-7 text-ink-50 space-y-5">
-      <p className="font-display text-lg sm:text-xl leading-snug text-ink-50">
-        {report.summary}
-      </p>
+      <p className="font-display text-lg sm:text-xl leading-snug text-ink-50">{report.summary}</p>
 
       <div className="grid sm:grid-cols-2 gap-5">
         <div>
-          <div className="text-[11px] uppercase tracking-[0.2em] text-sage-400 mb-2">
-            Strengths
-          </div>
+          <div className="text-[11px] uppercase tracking-[0.2em] text-sage-400 mb-2">Strengths</div>
           {report.strengths.length === 0 ? (
             <p className="text-sm text-ink-200">Building.</p>
           ) : (

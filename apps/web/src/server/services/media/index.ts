@@ -1,4 +1,4 @@
-import { prisma, type MediaSourceType, type RightsStatus } from '@speakwise/db';
+import { type MediaSourceType, type RightsStatus, prisma } from '@speakwise/db';
 
 export async function importMedia(input: {
   sourceType: MediaSourceType;
@@ -12,10 +12,10 @@ export async function importMedia(input: {
     input.sourceType === 'ai_generated'
       ? 'ai_generated'
       : input.sourceType === 'uploaded'
-      ? 'user_provided'
-      : input.sourceType === 'licensed'
-      ? 'licensed'
-      : 'unknown';
+        ? 'user_provided'
+        : input.sourceType === 'licensed'
+          ? 'licensed'
+          : 'unknown';
 
   return prisma.mediaItem.create({
     data: {

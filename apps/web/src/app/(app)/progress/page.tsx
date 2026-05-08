@@ -1,7 +1,7 @@
-import { getOrCreateUser } from '@/lib/auth/current-user';
-import { getDashboard } from '@/server/services/progress';
-import { getGamificationSummary } from '@/server/services/gamification';
 import { ProgressNarrative } from '@/components/progress/progress-narrative';
+import { getOrCreateUser } from '@/lib/auth/current-user';
+import { getGamificationSummary } from '@/server/services/gamification';
+import { getDashboard } from '@/server/services/progress';
 
 export default async function ProgressPage() {
   const user = await getOrCreateUser();
@@ -19,9 +19,7 @@ export default async function ProgressPage() {
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 sm:space-y-10">
       <div>
         <h1 className="font-display text-2xl sm:text-3xl text-ink-50">Your progress</h1>
-        <p className="text-sm text-ink-200 mt-1">
-          The trail Wise is keeping for you.
-        </p>
+        <p className="text-sm text-ink-200 mt-1">The trail Wise is keeping for you.</p>
       </div>
 
       {/* Stat strip */}
@@ -79,9 +77,7 @@ export default async function ProgressPage() {
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="rounded-2xl p-3 sm:p-4 surface">
-      <div className="text-[10px] sm:text-xs uppercase tracking-[0.2em] text-ink-200">
-        {label}
-      </div>
+      <div className="text-[10px] sm:text-xs uppercase tracking-[0.2em] text-ink-200">{label}</div>
       <div className="font-display text-xl sm:text-2xl text-ink-50 mt-1">{value}</div>
       {sub && <div className="text-[10px] sm:text-xs text-ink-200 mt-0.5">{sub}</div>}
     </div>

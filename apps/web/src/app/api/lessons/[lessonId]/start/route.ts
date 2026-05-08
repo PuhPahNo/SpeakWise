@@ -1,7 +1,7 @@
 import { withAuthAndJson } from '@/lib/api/route-handler';
-import { z } from 'zod';
-import { startLessonSession } from '@/server/services/lesson';
 import { bumpStreak } from '@/server/services/gamification';
+import { startLessonSession } from '@/server/services/lesson';
+import { z } from 'zod';
 
 const Schema = z.object({ mode: z.enum(['voice', 'text', 'mixed']).default('text') });
 

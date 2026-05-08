@@ -1,5 +1,5 @@
+import { DEFAULT_VOICE_ID, WISE_VOICES } from '@speakwise/ai';
 import { NextResponse } from 'next/server';
-import { WISE_VOICES, DEFAULT_VOICE_ID } from '@speakwise/ai';
 
 export const dynamic = 'force-dynamic';
 

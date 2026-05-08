@@ -1,8 +1,8 @@
 'use client';
 
+import { BarChart3, BookOpen, Home, MessageCircle, User } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, BookOpen, MessageCircle, BarChart3, User } from 'lucide-react';
 
 const tabs = [
   { href: '/command-center', label: 'Casa', Icon: Home },

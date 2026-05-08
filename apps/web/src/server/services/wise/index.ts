@@ -1,12 +1,12 @@
-import { z } from 'zod';
-import { prisma } from '@speakwise/db';
 import { Models, chatStructured } from '@speakwise/ai';
-import { WiseTurnOutputSchema, type WiseMessageRequest } from '@speakwise/schemas';
+import { prisma } from '@speakwise/db';
 import { emitUserEvent } from '@speakwise/events';
-import { getWiseProfileSummary } from '../profile';
+import { type WiseMessageRequest, WiseTurnOutputSchema } from '@speakwise/schemas';
+import { z } from 'zod';
 import { getActiveSkills, getSkillsDueForReview } from '../curriculum';
+import { applyMemoryCandidates, listMemory, retrieveRelevantMemories } from '../memory';
+import { getWiseProfileSummary } from '../profile';
 import { listVocabulary } from '../vocabulary';
-import { applyMemoryCandidates, retrieveRelevantMemories, listMemory } from '../memory';
 
 export async function wiseTurn(userId: string, req: WiseMessageRequest) {
   const [profile, activeSkills, dueSkills, dueVocab, memories] = await Promise.all([
@@ -49,7 +49,9 @@ export async function wiseTurn(userId: string, req: WiseMessageRequest) {
   const ai = result.data;
 
   // Persist memory candidates inline (high-confidence, non-trivial only)
-  await applyMemoryCandidates(userId, ai.memoryCandidates, { sourceSessionId: req.sessionId ?? null });
+  await applyMemoryCandidates(userId, ai.memoryCandidates, {
+    sourceSessionId: req.sessionId ?? null,
+  });
 
   await emitUserEvent(userId, 'AICall', {
     provider: 'openai',

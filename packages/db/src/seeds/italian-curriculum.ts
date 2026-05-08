@@ -269,7 +269,10 @@ export const italianCurriculumSeed: SeedSkill[] = [
     description: 'Common Italian foods, menu items, and restaurant phrases.',
     prerequisiteSlugs: ['it-vocab-greetings'],
     examples: [
-      { target: 'Vorrei una pizza margherita, per favore.', native: 'I would like a margherita pizza, please.' },
+      {
+        target: 'Vorrei una pizza margherita, per favore.',
+        native: 'I would like a margherita pizza, please.',
+      },
       { target: 'Il conto, per favore.', native: 'The check, please.' },
     ],
   },
@@ -303,7 +306,10 @@ export const italianCurriculumSeed: SeedSkill[] = [
     description: 'Saying your name, where you are from, what you do, why you are learning Italian.',
     prerequisiteSlugs: ['it-essere-present', 'it-vocab-greetings'],
     examples: [
-      { target: 'Mi chiamo Anthony e sono di New York.', native: 'My name is Anthony and I’m from New York.' },
+      {
+        target: 'Mi chiamo Anthony e sono di New York.',
+        native: 'My name is Anthony and I’m from New York.',
+      },
     ],
   },
   // ─── Culture ───────────────────────────────────────────────────────────

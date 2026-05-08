@@ -1,7 +1,7 @@
-import { redirect } from 'next/navigation';
-import { ensureProfile } from '@/server/services/profile';
-import { getOrCreateUser } from '@/lib/auth/current-user';
 import { CommandCenter } from '@/components/wise/command-center';
+import { getOrCreateUser } from '@/lib/auth/current-user';
+import { ensureProfile } from '@/server/services/profile';
+import { redirect } from 'next/navigation';
 
 export default async function CommandCenterPage() {
   const user = await getOrCreateUser();

@@ -8,10 +8,10 @@
 //  - usage is reported back so the caller can emit an AICall UserEvent
 
 import type { ZodTypeAny, z } from 'zod';
-import { getOpenAI } from './openai-client';
-import { loadPrompt, renderPrompt } from './prompt-loader';
 import { AIError, AISchemaValidationError } from './errors';
 import { Models } from './models';
+import { getOpenAI } from './openai-client';
+import { loadPrompt, renderPrompt } from './prompt-loader';
 
 export interface ChatStructuredOptions<S extends ZodTypeAny> {
   promptKey: string;
@@ -134,10 +134,10 @@ export async function transcribeAudio(input: TranscribeInput): Promise<Transcrib
   const start = Date.now();
   const openai = getOpenAI();
   const blob =
-    input.audio instanceof Blob
-      ? input.audio
-      : new Blob([input.audio], { type: 'audio/webm' });
-  const file = new File([blob], input.filename ?? 'audio.webm', { type: blob.type || 'audio/webm' });
+    input.audio instanceof Blob ? input.audio : new Blob([input.audio], { type: 'audio/webm' });
+  const file = new File([blob], input.filename ?? 'audio.webm', {
+    type: blob.type || 'audio/webm',
+  });
 
   const res = await openai.audio.transcriptions.create({
     file,
@@ -163,6 +163,11 @@ export async function embed(text: string): Promise<number[]> {
     input: text,
   });
   const vec = res.data[0]?.embedding;
-  if (!vec) throw new AIError({ provider: 'openai', purpose: 'embedding', message: 'No embedding returned' });
+  if (!vec)
+    throw new AIError({
+      provider: 'openai',
+      purpose: 'embedding',
+      message: 'No embedding returned',
+    });
   return vec;
 }

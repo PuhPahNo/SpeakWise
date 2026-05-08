@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
 import { renderPrompt } from '@speakwise/ai';
+import { describe, expect, it } from 'vitest';
 
 describe('renderPrompt', () => {
   it('substitutes {{VARS}} with provided values', () => {

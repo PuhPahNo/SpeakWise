@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server';
-import { z } from 'zod';
-import { prisma } from '@speakwise/db';
 import { verifyPassword } from '@/lib/auth/password';
 import { createSession } from '@/lib/auth/session';
+import { prisma } from '@speakwise/db';
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
 
 const Schema = z.object({
   username: z.string().min(1).max(120),

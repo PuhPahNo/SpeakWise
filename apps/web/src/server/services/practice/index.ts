@@ -1,4 +1,4 @@
-import { prisma, type InputType } from '@speakwise/db';
+import { type InputType, prisma } from '@speakwise/db';
 import { emitUserEvent } from '@speakwise/events';
 import { evaluateUserResponse } from '../correction';
 

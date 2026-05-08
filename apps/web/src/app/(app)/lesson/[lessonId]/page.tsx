@@ -1,7 +1,7 @@
-import { notFound } from 'next/navigation';
+import { LessonPlayer } from '@/components/lesson/lesson-player';
 import { getOrCreateUser } from '@/lib/auth/current-user';
 import { getLesson } from '@/server/services/lesson';
-import { LessonPlayer } from '@/components/lesson/lesson-player';
+import { notFound } from 'next/navigation';
 
 export default async function LessonPage({ params }: { params: Promise<{ lessonId: string }> }) {
   const { lessonId } = await params;

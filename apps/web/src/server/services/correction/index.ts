@@ -1,7 +1,7 @@
-import { prisma } from '@speakwise/db';
 import { Models, chatStructured } from '@speakwise/ai';
-import { CorrectionOutputSchema } from '@speakwise/schemas';
+import { prisma } from '@speakwise/db';
 import { emitUserEvent } from '@speakwise/events';
+import { CorrectionOutputSchema } from '@speakwise/schemas';
 import { recordSkillEvidence } from '../progress';
 
 export interface EvaluateInput {
@@ -18,7 +18,10 @@ export async function evaluateUserResponse({
 }: EvaluateInput) {
   const ur = await prisma.userResponse.findFirst({
     where: { id: userResponseId, session: { userId } },
-    include: { lessonTask: true, session: { include: { lesson: true, user: { include: { profile: true } } } } },
+    include: {
+      lessonTask: true,
+      session: { include: { lesson: true, user: { include: { profile: true } } } },
+    },
   });
   if (!ur) throw new Error('UserResponse not found');
 
@@ -26,8 +29,7 @@ export async function evaluateUserResponse({
   const level = profile?.currentLevel ?? 'beginner';
   // Honor learner's correction-style preference (Master PRD §correction);
   // explicit override wins, then profile, then a sensible default.
-  const effectiveMode =
-    correctionMode ?? profile?.preferredCorrectionStyle ?? 'adaptive';
+  const effectiveMode = correctionMode ?? profile?.preferredCorrectionStyle ?? 'adaptive';
 
   // Resolve skill names so the prompt can be skill-specific in its
   // explanation (e.g. "passato prossimo agreement" instead of generic).

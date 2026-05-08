@@ -1,6 +1,6 @@
-import Link from 'next/link';
 import { getOrCreateUser } from '@/lib/auth/current-user';
 import { listLessons } from '@/server/services/lesson';
+import Link from 'next/link';
 
 export const metadata = { title: 'Le tue lezioni · Speakwise' };
 
@@ -45,9 +45,7 @@ export default async function LessonsPage() {
 
       {inProgress.length > 0 && (
         <section>
-          <div className="text-[11px] uppercase tracking-[0.2em] text-wise-400 mb-3">
-            In flight
-          </div>
+          <div className="text-[11px] uppercase tracking-[0.2em] text-wise-400 mb-3">In flight</div>
           <ul className="space-y-2">
             {inProgress.map((l) => (
               <LessonRow key={l.id} l={l} />

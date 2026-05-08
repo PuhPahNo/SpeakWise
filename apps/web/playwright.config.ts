@@ -41,7 +41,7 @@ export default defineConfig({
   webServer: process.env.CI
     ? undefined
     : {
-        command: `pnpm --filter speakwise-web dev`,
+        command: 'pnpm --filter speakwise-web dev',
         port: PORT,
         reuseExistingServer: true,
         timeout: 60_000,

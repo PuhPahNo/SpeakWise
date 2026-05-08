@@ -9,12 +9,7 @@ export const XP_REWARDS = {
   streak_milestone: 100,
 };
 
-export async function awardXp(
-  userId: string,
-  amount: number,
-  reason: string,
-  sourceId?: string,
-) {
+export async function awardXp(userId: string, amount: number, reason: string, sourceId?: string) {
   await prisma.xpEntry.create({ data: { userId, amount, reason, sourceId } });
 }
 

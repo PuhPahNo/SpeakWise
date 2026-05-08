@@ -1,6 +1,6 @@
 import { withAuthAndJson } from '@/lib/api/route-handler';
-import { ImportMediaRequestSchema } from '@speakwise/schemas';
 import { importMedia } from '@/server/services/media';
+import { ImportMediaRequestSchema } from '@speakwise/schemas';
 
 export async function POST(req: Request) {
   return withAuthAndJson(ImportMediaRequestSchema, req, async (_ctx, body) =>

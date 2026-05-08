@@ -1,8 +1,8 @@
 'use client';
 
-import { createContext, useCallback, useContext, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Info, X } from 'lucide-react';
+import { createContext, useCallback, useContext, useState } from 'react';
 
 type ToastKind = 'success' | 'error' | 'info';
 
@@ -69,9 +69,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium leading-snug">{t.title}</div>
-                {t.body && (
-                  <div className="text-xs text-ink-200 mt-0.5 leading-snug">{t.body}</div>
-                )}
+                {t.body && <div className="text-xs text-ink-200 mt-0.5 leading-snug">{t.body}</div>}
               </div>
               <button
                 type="button"

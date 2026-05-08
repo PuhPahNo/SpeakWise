@@ -1,9 +1,12 @@
-import { prisma, type VocabStatus } from '@speakwise/db';
+import { type VocabStatus, prisma } from '@speakwise/db';
 import { emitUserEvent } from '@speakwise/events';
 
 const REVIEW_DAYS_CORRECT = [1, 3, 7, 14, 30];
 
-export async function listVocabulary(userId: string, opts?: { status?: VocabStatus; tag?: string; dueForReview?: boolean }) {
+export async function listVocabulary(
+  userId: string,
+  opts?: { status?: VocabStatus; tag?: string; dueForReview?: boolean },
+) {
   return prisma.vocabularyItem.findMany({
     where: {
       userId,
@@ -16,16 +19,19 @@ export async function listVocabulary(userId: string, opts?: { status?: VocabStat
   });
 }
 
-export async function createVocabulary(userId: string, input: {
-  targetText: string;
-  nativeText: string;
-  partOfSpeech?: string;
-  exampleSentence?: string;
-  exampleTranslation?: string;
-  tags?: string[];
-  sourceLessonId?: string;
-  sourceSessionId?: string;
-}) {
+export async function createVocabulary(
+  userId: string,
+  input: {
+    targetText: string;
+    nativeText: string;
+    partOfSpeech?: string;
+    exampleSentence?: string;
+    exampleTranslation?: string;
+    tags?: string[];
+    sourceLessonId?: string;
+    sourceSessionId?: string;
+  },
+) {
   const item = await prisma.vocabularyItem.create({
     data: {
       userId,
@@ -48,7 +54,11 @@ export async function createVocabulary(userId: string, input: {
   return item;
 }
 
-export async function reviewVocabulary(userId: string, vocabId: string, result: 'correct' | 'incorrect') {
+export async function reviewVocabulary(
+  userId: string,
+  vocabId: string,
+  result: 'correct' | 'incorrect',
+) {
   const prev = await prisma.vocabularyItem.findFirst({ where: { id: vocabId, userId } });
   if (!prev) throw new Error('Vocabulary item not found');
 
@@ -57,9 +67,10 @@ export async function reviewVocabulary(userId: string, vocabId: string, result: 
   const newScore = Math.max(0, Math.min(1, oldScore + delta));
 
   const correctCount = prev.correctCount + (result === 'correct' ? 1 : 0);
-  const reviewDays = result === 'correct'
-    ? REVIEW_DAYS_CORRECT[Math.min(correctCount, REVIEW_DAYS_CORRECT.length - 1)] ?? 30
-    : 1;
+  const reviewDays =
+    result === 'correct'
+      ? (REVIEW_DAYS_CORRECT[Math.min(correctCount, REVIEW_DAYS_CORRECT.length - 1)] ?? 30)
+      : 1;
   const nextReviewAt = new Date(Date.now() + reviewDays * 24 * 60 * 60 * 1000);
 
   let status: VocabStatus = prev.status;

@@ -1,6 +1,6 @@
 import { withAuthAndJson } from '@/lib/api/route-handler';
-import { z } from 'zod';
 import { extractFromSession } from '@/server/services/memory';
+import { z } from 'zod';
 
 const Schema = z.object({ sessionId: z.string().uuid() });
 

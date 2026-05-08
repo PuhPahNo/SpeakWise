@@ -1,14 +1,9 @@
 import { withAuthAndJson } from '@/lib/api/route-handler';
-import { z } from 'zod';
+import { XP_REWARDS, awardXp, bumpStreak, getXpEarnedSince } from '@/server/services/gamification';
 import { completeLessonSession } from '@/server/services/lesson';
 import { extractFromSession } from '@/server/services/memory';
-import {
-  awardXp,
-  bumpStreak,
-  XP_REWARDS,
-  getXpEarnedSince,
-} from '@/server/services/gamification';
 import { recommendNext } from '@/server/services/wise';
+import { z } from 'zod';
 
 const Schema = z.object({ sessionId: z.string().uuid() });
 

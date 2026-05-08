@@ -1,6 +1,6 @@
+import { AIError } from './errors';
 import { Models } from './models';
 import { resolveVoiceId } from './voices';
-import { AIError } from './errors';
 
 export type SpeakLanguage = 'it' | 'en';
 
@@ -23,7 +23,11 @@ export interface SpeakResult {
 export async function synthesizeSpeech(input: SpeakInput): Promise<SpeakResult> {
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) {
-    throw new AIError({ provider: 'elevenlabs', purpose: 'tts', message: 'ELEVENLABS_API_KEY missing' });
+    throw new AIError({
+      provider: 'elevenlabs',
+      purpose: 'tts',
+      message: 'ELEVENLABS_API_KEY missing',
+    });
   }
 
   const voiceId = resolveVoiceId(input.voiceId);
@@ -82,7 +86,11 @@ export async function synthesizeSpeech(input: SpeakInput): Promise<SpeakResult> 
 export async function elevenLabsAccountInfo(): Promise<{ subscription: unknown }> {
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) {
-    throw new AIError({ provider: 'elevenlabs', purpose: 'account', message: 'ELEVENLABS_API_KEY missing' });
+    throw new AIError({
+      provider: 'elevenlabs',
+      purpose: 'account',
+      message: 'ELEVENLABS_API_KEY missing',
+    });
   }
   const res = await fetch('https://api.elevenlabs.io/v1/user', {
     headers: { 'xi-api-key': apiKey },

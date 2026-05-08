@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { authenticate, collectErrors } from './_helpers';
 
 test.describe('public surface', () => {

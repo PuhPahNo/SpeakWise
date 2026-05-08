@@ -1,10 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import {
-  WISE_VOICES,
-  DEFAULT_VOICE_ID,
-  getVoiceById,
-  resolveVoiceId,
-} from '@speakwise/ai';
+import { DEFAULT_VOICE_ID, WISE_VOICES, getVoiceById, resolveVoiceId } from '@speakwise/ai';
+import { describe, expect, it } from 'vitest';
 
 describe('voices catalog', () => {
   it('has at least one voice and a default', () => {

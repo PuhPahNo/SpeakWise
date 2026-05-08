@@ -1,7 +1,7 @@
 import { withAuth, withAuthAndJson } from '@/lib/api/route-handler';
 import { ensureProfile } from '@/server/services/profile';
-import { PatchMeRequestSchema } from '@speakwise/schemas';
 import { prisma } from '@speakwise/db';
+import { PatchMeRequestSchema } from '@speakwise/schemas';
 
 export async function GET() {
   return withAuth(async ({ user }) => {

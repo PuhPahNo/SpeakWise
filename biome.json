@@ -12,7 +12,10 @@
       "**/.expo",
       "**/coverage",
       "**/*.generated.*",
-      "**/prisma/migrations/**"
+      "**/prisma/migrations/**",
+      "**/playwright-report/**",
+      "**/test-results/**",
+      "**/*.css"
     ]
   },
   "formatter": {
@@ -27,9 +30,24 @@
       "recommended": true,
       "correctness": { "noUnusedVariables": "warn", "useExhaustiveDependencies": "warn" },
       "style": { "noNonNullAssertion": "warn", "useImportType": "warn" },
-      "suspicious": { "noExplicitAny": "warn" }
+      "suspicious": { "noExplicitAny": "warn", "noArrayIndexKey": "warn" },
+      "a11y": {
+        "useButtonType": "warn",
+        "noLabelWithoutControl": "warn"
+      }
     }
   },
+  "overrides": [
+    {
+      "include": ["**/e2e/**", "**/tests/**", "**/*.test.ts", "**/*.spec.ts"],
+      "linter": {
+        "rules": {
+          "style": { "noNonNullAssertion": "off" },
+          "suspicious": { "noExplicitAny": "off" }
+        }
+      }
+    }
+  ],
   "javascript": {
     "formatter": {
       "quoteStyle": "single",

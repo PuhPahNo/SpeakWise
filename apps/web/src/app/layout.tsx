@@ -1,6 +1,6 @@
-import type { Metadata, Viewport } from 'next';
-import { Inter, Fraunces } from 'next/font/google';
 import { Providers } from '@/components/providers';
+import type { Metadata, Viewport } from 'next';
+import { Fraunces, Inter } from 'next/font/google';
 import '@/styles/globals.css';
 
 const inter = Inter({

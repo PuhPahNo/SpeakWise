@@ -1,7 +1,7 @@
+import { Freestyle } from '@/components/wise/freestyle';
 import { getOrCreateUser } from '@/lib/auth/current-user';
 import { ensureProfile } from '@/server/services/profile';
 import { redirect } from 'next/navigation';
-import { Freestyle } from '@/components/wise/freestyle';
 
 export const metadata = { title: 'Talk to Wise · Speakwise' };
 

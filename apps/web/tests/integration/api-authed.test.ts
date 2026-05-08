@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { api, signInForTests } from './_helpers';
 
 let cookie: string;
@@ -19,20 +19,18 @@ describe('authed read-only endpoints', () => {
   });
 
   it('GET /api/profile returns the learner profile', async () => {
-    const { data } = await api<{ id: string; userId: string }>(
-      'GET',
-      '/api/profile',
-      { cookie, expectStatus: 200 },
-    );
+    const { data } = await api<{ id: string; userId: string }>('GET', '/api/profile', {
+      cookie,
+      expectStatus: 200,
+    });
     expect(data.id).toMatch(/^[0-9a-f-]{36}$/);
   });
 
   it('GET /api/profile/summary returns summary or null', async () => {
-    const { data } = await api<{ summary: unknown }>(
-      'GET',
-      '/api/profile/summary',
-      { cookie, expectStatus: 200 },
-    );
+    const { data } = await api<{ summary: unknown }>('GET', '/api/profile/summary', {
+      cookie,
+      expectStatus: 200,
+    });
     expect('summary' in (data as object)).toBe(true);
   });
 
@@ -58,11 +56,10 @@ describe('authed read-only endpoints', () => {
   });
 
   it('GET /api/gamification/comeback returns offer or null', async () => {
-    const { data } = await api<{ offer: unknown }>(
-      'GET',
-      '/api/gamification/comeback',
-      { cookie, expectStatus: 200 },
-    );
+    const { data } = await api<{ offer: unknown }>('GET', '/api/gamification/comeback', {
+      cookie,
+      expectStatus: 200,
+    });
     expect('offer' in (data as object)).toBe(true);
   });
 

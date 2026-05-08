@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server';
-import { transcribeAudio } from '@speakwise/ai';
 import { getOrCreateUser } from '@/lib/auth/current-user';
+import { transcribeAudio } from '@speakwise/ai';
+import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

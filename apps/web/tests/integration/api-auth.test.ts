@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { api } from './_helpers';
 
 describe('auth flow', () => {
@@ -23,14 +23,11 @@ describe('auth flow', () => {
   });
 
   it('POST /api/auth/signin with valid creds → 200 + sw_session cookie', async () => {
-    const res = await fetch(
-      `${process.env.APP_URL ?? 'http://localhost:3001'}/api/auth/signin`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: 'anthony', password: 'admin123' }),
-      },
-    );
+    const res = await fetch(`${process.env.APP_URL ?? 'http://localhost:3001'}/api/auth/signin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'anthony', password: 'admin123' }),
+    });
     expect(res.status).toBe(200);
     const setCookie = res.headers.get('set-cookie') ?? '';
     expect(setCookie).toMatch(/sw_session=/);

@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
 import type { VoiceState } from '@speakwise/types';
+import { useMemo } from 'react';
 
 interface Props {
   state: VoiceState;
@@ -19,13 +19,7 @@ const SIZE: Record<NonNullable<Props['size']>, string> = {
   xl: 'h-72 w-72 sm:h-80 sm:w-80',
 };
 
-export function VoiceOrb({
-  state,
-  size = 'lg',
-  onTap,
-  ariaLabel,
-  amplitude = 0,
-}: Props) {
+export function VoiceOrb({ state, size = 'lg', onTap, ariaLabel, amplitude = 0 }: Props) {
   const animation = useMemo(() => {
     switch (state) {
       case 'listening':
@@ -37,9 +31,6 @@ export function VoiceOrb({
         return 'animate-orb-breathe';
       case 'error':
         return ''; // dim, no animation
-      case 'awaiting_user_response':
-      case 'idle':
-      case 'paused':
       default:
         return 'animate-orb-breathe';
     }
@@ -48,8 +39,7 @@ export function VoiceOrb({
   const isError = state === 'error';
 
   // Dynamic outer glow scales with mic amplitude when listening
-  const dynamicGlow =
-    state === 'listening' ? Math.max(0, Math.min(1, amplitude)) : 0;
+  const dynamicGlow = state === 'listening' ? Math.max(0, Math.min(1, amplitude)) : 0;
 
   return (
     <div className="relative inline-flex items-center justify-center">

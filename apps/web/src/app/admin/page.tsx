@@ -1,6 +1,6 @@
 import { getOrCreateUser } from '@/lib/auth/current-user';
-import { redirect } from 'next/navigation';
 import { aiUsageSummary, listFeatureFlags, listPromptTemplates } from '@/server/services/admin';
+import { redirect } from 'next/navigation';
 
 export default async function AdminPage() {
   const user = await getOrCreateUser();
@@ -54,10 +54,14 @@ export default async function AdminPage() {
 
       <section>
         <h2 className="font-display text-xl mb-3">Feature flags</h2>
-        {flags.length === 0 ? <p className="text-ink-500 text-sm">None.</p> : (
+        {flags.length === 0 ? (
+          <p className="text-ink-500 text-sm">None.</p>
+        ) : (
           <ul className="space-y-1 text-sm">
             {flags.map((f) => (
-              <li key={f.id}><code>{f.key}</code> · {f.enabled ? 'on' : 'off'} · {f.rolloutPct}%</li>
+              <li key={f.id}>
+                <code>{f.key}</code> · {f.enabled ? 'on' : 'off'} · {f.rolloutPct}%
+              </li>
             ))}
           </ul>
         )}

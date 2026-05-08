@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
 import { VoiceOrb } from '@/components/voice/voice-orb';
 import { useVoiceTutor } from '@/hooks/use-voice-tutor';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 
 interface Turn {
   role: 'user' | 'wise';
@@ -92,7 +92,7 @@ export function Freestyle({ firstName }: { firstName: string }) {
       }
       await tutor.speak(data.wiseMessage);
     } catch {
-      const fallback = "Sorry — try that again?";
+      const fallback = 'Sorry — try that again?';
       addTurn('wise', fallback);
       await tutor.speak(fallback);
     } finally {
@@ -142,12 +142,7 @@ export function Freestyle({ firstName }: { firstName: string }) {
       </header>
 
       <div className="flex justify-center">
-        <VoiceOrb
-          state={tutor.state}
-          size="md"
-          amplitude={tutor.amplitude}
-          onTap={onOrbTap}
-        />
+        <VoiceOrb state={tutor.state} size="md" amplitude={tutor.amplitude} onTap={onOrbTap} />
       </div>
 
       {/* Conversation transcript */}

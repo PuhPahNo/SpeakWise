@@ -1,7 +1,7 @@
 import { withAuth } from '@/lib/api/route-handler';
+import { getDashboard } from '@/server/services/progress';
 import { Models, chatStructured } from '@speakwise/ai';
 import { ProgressReportOutputSchema } from '@speakwise/schemas';
-import { getDashboard } from '@/server/services/progress';
 
 export async function GET() {
   return withAuth(async ({ userId }) => {

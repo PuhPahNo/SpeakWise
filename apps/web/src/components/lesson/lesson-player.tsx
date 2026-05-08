@@ -1,26 +1,29 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Sparkles } from 'lucide-react';
-import { AnimatePresence, motion } from 'framer-motion';
 import { VoiceOrb } from '@/components/voice/voice-orb';
 import { useVoiceTutor } from '@/hooks/use-voice-tutor';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Sparkles } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 
-interface Task {
+// We accept anything Prisma returns from `lesson.findFirst({ include: { tasks } })`
+// without requiring a strict shape, then read the fields we need with safe casts.
+type Task = {
   id: string;
   taskType: string;
   prompt: string;
+  // Prisma returns these as JsonValue; treat them loosely on the client.
   options: unknown;
   expectedAnswer: unknown;
-  metadata: { explanation?: string; vocabularyTargets?: string[] };
+  metadata: unknown;
   orderIndex: number;
-}
+};
 
-interface Lesson {
+type Lesson = {
   id: string;
   content: unknown;
-}
+};
 
 interface CorrectionData {
   isCorrect: boolean;
@@ -46,8 +49,7 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
   const [newMemory, setNewMemory] = useState<Array<{ type: string; content: string }>>([]);
   const briefedRef = useRef(false);
 
-  const briefing =
-    (lesson.content as { briefing?: string } | null)?.briefing ?? '';
+  const briefing = (lesson.content as { briefing?: string } | null)?.briefing ?? '';
 
   const tutor = useVoiceTutor({
     sttLanguage: 'it',
@@ -60,9 +62,7 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
   });
 
   const currentTask = tasks[taskIndex];
-  const opts = (currentTask?.options ?? null) as
-    | Array<{ value: string; label: string }>
-    | null;
+  const opts = (currentTask?.options ?? null) as Array<{ value: string; label: string }> | null;
 
   // ── Session start + briefing narration ───────────────────────────────
   async function startSession() {
@@ -98,9 +98,7 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
     // do NOT auto-listen (user clicks an option or types). For speaking
     // tasks we auto-listen so the user can just answer.
     const isVoiceAnswerTask =
-      t.taskType === 'speaking_prompt' ||
-      t.taskType === 'translation' ||
-      t.taskType === 'roleplay';
+      t.taskType === 'speaking_prompt' || t.taskType === 'translation' || t.taskType === 'roleplay';
     await tutor.speak(t.prompt, { autoListenAfter: isVoiceAnswerTask });
   }
 
@@ -115,8 +113,7 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
         body: JSON.stringify({
           sessionId,
           lessonTaskId: currentTask.id,
-          inputType:
-            currentTask.taskType === 'multiple_choice' ? 'multiple_choice' : 'voice',
+          inputType: currentTask.taskType === 'multiple_choice' ? 'multiple_choice' : 'voice',
           answer: a,
         }),
       });
@@ -178,7 +175,7 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
           : `Mission complete. ${tasks} tasks down, a few rough spots to revisit.`;
       const memoryLine =
         (data.newMemory ?? []).length > 0
-          ? ` I learned something new about you, too — saving it.`
+          ? ' I learned something new about you, too — saving it.'
           : '';
       await tutor.speak(headline + memoryLine, { autoListenAfter: false });
     } finally {
@@ -253,9 +250,7 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
             {streakDays && streakDays > 0 && (
               <>
                 <span className="opacity-30">·</span>
-                <span className="text-ink-100 font-medium">
-                  {streakDays}-day streak
-                </span>
+                <span className="text-ink-100 font-medium">{streakDays}-day streak</span>
               </>
             )}
           </div>
@@ -301,12 +296,7 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
         </div>
       </div>
 
-      <VoiceOrb
-        state={tutor.state}
-        size="lg"
-        amplitude={tutor.amplitude}
-        onTap={onOrbTap}
-      />
+      <VoiceOrb state={tutor.state} size="lg" amplitude={tutor.amplitude} onTap={onOrbTap} />
 
       <AnimatePresence mode="wait">
         <motion.div

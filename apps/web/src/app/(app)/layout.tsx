@@ -1,7 +1,7 @@
-import Link from 'next/link';
 import { MobileTabBar } from '@/components/ui/mobile-tab-bar';
 import { UserMenu } from '@/components/ui/user-menu';
 import { getCurrentUser } from '@/lib/auth/current-user';
+import Link from 'next/link';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -12,12 +12,24 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           Speakwise
         </Link>
         <nav className="hidden md:flex gap-6 text-sm text-ink-200">
-          <Link href="/command-center" className="hover:text-ink-50 transition">Casa</Link>
-          <Link href="/talk" className="hover:text-ink-50 transition">Parla</Link>
-          <Link href="/lessons" className="hover:text-ink-50 transition">Lezioni</Link>
-          <Link href="/vocabulary" className="hover:text-ink-50 transition">Parole</Link>
-          <Link href="/progress" className="hover:text-ink-50 transition">Progressi</Link>
-          <Link href="/profile" className="hover:text-ink-50 transition">Profilo</Link>
+          <Link href="/command-center" className="hover:text-ink-50 transition">
+            Casa
+          </Link>
+          <Link href="/talk" className="hover:text-ink-50 transition">
+            Parla
+          </Link>
+          <Link href="/lessons" className="hover:text-ink-50 transition">
+            Lezioni
+          </Link>
+          <Link href="/vocabulary" className="hover:text-ink-50 transition">
+            Parole
+          </Link>
+          <Link href="/progress" className="hover:text-ink-50 transition">
+            Progressi
+          </Link>
+          <Link href="/profile" className="hover:text-ink-50 transition">
+            Profilo
+          </Link>
         </nav>
         <UserMenu name={user.name} />
       </header>

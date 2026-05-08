@@ -1,10 +1,10 @@
-import { prisma, type LessonType, type LessonAuthor, type CEFRLevel } from '@speakwise/db';
 import { Models, chatStructured } from '@speakwise/ai';
-import { LessonGenerationOutputSchema } from '@speakwise/schemas';
+import { type CEFRLevel, type LessonAuthor, type LessonType, prisma } from '@speakwise/db';
 import { emitUserEvent } from '@speakwise/events';
-import { getWiseProfileSummary } from '../profile';
+import { LessonGenerationOutputSchema } from '@speakwise/schemas';
 import { getActiveSkills, getSkillsBySlugs, getSkillsDueForReview } from '../curriculum';
 import { listMemory } from '../memory';
+import { getWiseProfileSummary } from '../profile';
 
 export interface GenerateLessonInput {
   userId: string;
@@ -72,7 +72,7 @@ export async function generateLesson(input: GenerateLessonInput) {
 
   const request = {
     lessonType: input.lessonType,
-    durationMinutes: input.durationMinutes ?? profile.level === 'complete_beginner' ? 8 : 12,
+    durationMinutes: (input.durationMinutes ?? profile.level === 'complete_beginner') ? 8 : 12,
     interestTheme: input.interestTheme ?? null,
     userRequest: input.userRequest ?? null,
   };
@@ -120,7 +120,10 @@ export async function generateLesson(input: GenerateLessonInput) {
       content: { briefing: ai.briefing, recapPlan: ai.recapPlan },
       createdBy: input.createdBy ?? 'wise',
       tasks: {
-        create: ai.tasks.map((t, i) => ({
+        // biome-ignore lint/suspicious/noExplicitAny: Prisma's Json input type
+        // is structurally narrower than what Zod-validated AI output produces;
+        // cast through any to bridge the two.
+        create: ai.tasks.map((t, i): any => ({
           taskType: t.taskType,
           orderIndex: i,
           prompt: t.prompt,
@@ -128,8 +131,8 @@ export async function generateLesson(input: GenerateLessonInput) {
             .map((slug) => aiSlugToId.get(slug))
             .filter((v): v is string => Boolean(v)),
           vocabularyItemIds: [],
-          expectedAnswer: (t.expectedAnswer ?? null) as object | null,
-          options: (t.options ?? null) as object | null,
+          expectedAnswer: t.expectedAnswer ?? null,
+          options: t.options ?? null,
           metadata: { explanation: t.explanation, vocabularyTargets: t.vocabularyTargets },
         })),
       },
@@ -182,7 +185,11 @@ export async function listLessons(userId: string, opts?: { limit?: number }) {
   });
 }
 
-export async function startLessonSession(userId: string, lessonId: string, mode: 'voice' | 'text' | 'mixed') {
+export async function startLessonSession(
+  userId: string,
+  lessonId: string,
+  mode: 'voice' | 'text' | 'mixed',
+) {
   const lesson = await getLesson(userId, lessonId);
   if (!lesson) throw new Error('Lesson not found');
 

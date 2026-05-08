@@ -1,6 +1,6 @@
+import { VocabReview } from '@/components/vocabulary/vocab-review';
 import { getOrCreateUser } from '@/lib/auth/current-user';
 import { listVocabulary } from '@/server/services/vocabulary';
-import { VocabReview } from '@/components/vocabulary/vocab-review';
 import Link from 'next/link';
 
 export default async function VocabReviewPage() {
@@ -16,8 +16,8 @@ export default async function VocabReviewPage() {
       <div className="max-w-md mx-auto px-4 sm:px-6 py-10 text-center">
         <h1 className="font-display text-2xl text-ink-50">Nothing due</h1>
         <p className="text-sm text-ink-200 mt-3">
-          You&apos;re caught up on reviews. Come back tomorrow, or run today&apos;s
-          mission to add new words.
+          You&apos;re caught up on reviews. Come back tomorrow, or run today&apos;s mission to add
+          new words.
         </p>
         <Link
           href="/command-center"

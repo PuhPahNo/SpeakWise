@@ -15,7 +15,7 @@
  * to verify the key works). Useful if you want zero ElevenLabs char usage.
  */
 
-import { writeFile, mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 const skipTts = process.argv.includes('--no-tts');
@@ -35,7 +35,9 @@ async function step<T>(name: string, fn: () => Promise<T>): Promise<T | null> {
   const start = Date.now();
   try {
     const result = await fn();
-    process.stdout.write(`\r${colors.green('✓')} ${name} ${colors.dim(`(${Date.now() - start}ms)`)}\n`);
+    process.stdout.write(
+      `\r${colors.green('✓')} ${name} ${colors.dim(`(${Date.now() - start}ms)`)}\n`,
+    );
     pass++;
     return result;
   } catch (e) {
@@ -101,41 +103,40 @@ async function main() {
       headers: { 'xi-api-key': key },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
-    const data = (await res.json()) as { subscription?: { tier?: string; character_limit?: number } };
+    const data = (await res.json()) as {
+      subscription?: { tier?: string; character_limit?: number };
+    };
     return data.subscription?.tier ?? 'unknown';
   });
 
   // ── 4. ElevenLabs TTS (default voice = Bill) ──────────────────────────
   if (!skipTts) {
-    const audio = await step(
-      'ElevenLabs TTS — default voice (Bill) speaking Italian',
-      async () => {
-        const key = process.env.ELEVENLABS_API_KEY;
-        if (!key) throw new Error('ELEVENLABS_API_KEY not set');
-        const voiceId = 'pqHfZKP75CvOlQylNhV4'; // Bill — premade, free-tier accessible
-        const model = process.env.ELEVENLABS_MODEL_ID ?? 'eleven_turbo_v2_5';
-        const res = await fetch(
-          `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
-          {
-            method: 'POST',
-            headers: {
-              'xi-api-key': key,
-              'Content-Type': 'application/json',
-              Accept: 'audio/mpeg',
-            },
-            body: JSON.stringify({
-              text: 'Ciao, sono Wise. Iniziamo la lezione.',
-              model_id: model,
-              voice_settings: { stability: 0.45, similarity_boost: 0.75 },
-            }),
+    const audio = await step('ElevenLabs TTS — default voice (Bill) speaking Italian', async () => {
+      const key = process.env.ELEVENLABS_API_KEY;
+      if (!key) throw new Error('ELEVENLABS_API_KEY not set');
+      const voiceId = 'pqHfZKP75CvOlQylNhV4'; // Bill — premade, free-tier accessible
+      const model = process.env.ELEVENLABS_MODEL_ID ?? 'eleven_turbo_v2_5';
+      const res = await fetch(
+        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
+        {
+          method: 'POST',
+          headers: {
+            'xi-api-key': key,
+            'Content-Type': 'application/json',
+            Accept: 'audio/mpeg',
           },
-        );
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
-        }
-        return new Uint8Array(await res.arrayBuffer());
-      },
-    );
+          body: JSON.stringify({
+            text: 'Ciao, sono Wise. Iniziamo la lezione.',
+            model_id: model,
+            voice_settings: { stability: 0.45, similarity_boost: 0.75 },
+          }),
+        },
+      );
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      }
+      return new Uint8Array(await res.arrayBuffer());
+    });
 
     if (audio) {
       const outPath = resolve(process.cwd(), 'scripts/.smoke-output.mp3');

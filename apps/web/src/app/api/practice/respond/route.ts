@@ -1,7 +1,7 @@
 import { withAuthAndJson } from '@/lib/api/route-handler';
-import { PracticeRespondRequestSchema } from '@speakwise/schemas';
+import { XP_REWARDS, awardXp } from '@/server/services/gamification';
 import { submitResponse } from '@/server/services/practice';
-import { awardXp, XP_REWARDS } from '@/server/services/gamification';
+import { PracticeRespondRequestSchema } from '@speakwise/schemas';
 
 export async function POST(req: Request) {
   return withAuthAndJson(PracticeRespondRequestSchema, req, async ({ userId }, body) => {

@@ -1,0 +1,73 @@
+name: E2E (manual)
+
+# Integration + Playwright tests need a real Postgres + dev server +
+# OpenAI/ElevenLabs API keys. They aren't free to run, so this workflow
+# only fires on manual dispatch from the Actions tab.
+#
+# Required repo secrets:
+#   AUTH_SESSION_SECRET (32+ chars, e.g. `openssl rand -base64 32`)
+#   OPENAI_API_KEY
+#   ELEVENLABS_API_KEY
+#   CRON_SECRET (16+ chars)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: speakwise
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+    env:
+      NODE_ENV: test
+      APP_URL: http://localhost:3001
+      NEXT_PUBLIC_APP_URL: http://localhost:3001
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/speakwise?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/speakwise?schema=public
+      AUTH_SESSION_SECRET: ${{ secrets.AUTH_SESSION_SECRET }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @speakwise/db prisma:generate
+      - run: pnpm --filter @speakwise/db exec prisma db push --skip-generate
+      - run: pnpm --filter @speakwise/db seed
+      - run: node --experimental-strip-types --env-file=.env scripts/create-user.ts anthony admin123 --admin --name "Anthony"
+      - name: Install Playwright browsers
+        run: pnpm --filter speakwise-web exec playwright install chromium
+      - name: Start dev server
+        run: pnpm --filter speakwise-web dev > /tmp/dev.log 2>&1 &
+      - name: Wait for server
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3001/api/health >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/dev.log
+          exit 1
+      - name: Vitest integration tests
+        run: pnpm --filter speakwise-web exec vitest run tests/integration
+      - name: Playwright E2E tests
+        run: pnpm --filter speakwise-web exec playwright test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 14

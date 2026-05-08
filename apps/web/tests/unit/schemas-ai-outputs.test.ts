@@ -1,12 +1,12 @@
-import { describe, it, expect } from 'vitest';
 import {
-  LessonGenerationOutputSchema,
   CorrectionOutputSchema,
-  WiseTurnOutputSchema,
-  ProgressReportOutputSchema,
+  LessonGenerationOutputSchema,
   MemoryExtractionOutputSchema,
   PlacementAssessmentOutputSchema,
+  ProgressReportOutputSchema,
+  WiseTurnOutputSchema,
 } from '@speakwise/schemas';
+import { describe, expect, it } from 'vitest';
 
 describe('LessonGenerationOutputSchema', () => {
   const valid = {
@@ -67,7 +67,8 @@ describe('CorrectionOutputSchema', () => {
       score: 0.4,
       encouragement: 'Close!',
       correctedAnswer: 'Ho mangiato la pizza',
-      explanation: 'In passato prossimo with avere, the past participle stays masculine singular by default.',
+      explanation:
+        'In passato prossimo with avere, the past participle stays masculine singular by default.',
       mistakeType: 'grammar',
       severity: 'moderate',
       skillTags: ['it-passato-prossimo-avere'],
@@ -79,9 +80,16 @@ describe('CorrectionOutputSchema', () => {
 
   it('rejects score out of [0,1]', () => {
     const bad = CorrectionOutputSchema.safeParse({
-      isCorrect: true, score: 1.5, encouragement: '', correctedAnswer: '',
-      explanation: '', mistakeType: 'other', severity: 'minor',
-      skillTags: [], retryPrompt: null, shouldUpdateMemory: false,
+      isCorrect: true,
+      score: 1.5,
+      encouragement: '',
+      correctedAnswer: '',
+      explanation: '',
+      mistakeType: 'other',
+      severity: 'minor',
+      skillTags: [],
+      retryPrompt: null,
+      shouldUpdateMemory: false,
     });
     expect(bad.success).toBe(false);
   });
@@ -145,7 +153,9 @@ describe('MemoryExtractionOutputSchema', () => {
       memoryCandidates: [
         { type: 'goal', content: 'x', visibility: 'user_visible', confidence: 1.5 },
       ],
-      profileUpdates: {}, skillSignals: [], vocabularySignals: [],
+      profileUpdates: {},
+      skillSignals: [],
+      vocabularySignals: [],
     });
     expect(r.success).toBe(false);
   });

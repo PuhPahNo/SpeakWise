@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
 import { prisma } from '@speakwise/db';
+import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 

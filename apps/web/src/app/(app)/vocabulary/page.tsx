@@ -1,6 +1,6 @@
-import Link from 'next/link';
 import { getOrCreateUser } from '@/lib/auth/current-user';
 import { listVocabulary } from '@/server/services/vocabulary';
+import Link from 'next/link';
 
 export default async function VocabularyPage({
   searchParams,
@@ -20,9 +20,7 @@ export default async function VocabularyPage({
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl sm:text-3xl text-ink-50">Vocabulary</h1>
-          <p className="text-sm text-ink-200 mt-1">
-            What Wise has put in your bank.
-          </p>
+          <p className="text-sm text-ink-200 mt-1">What Wise has put in your bank.</p>
         </div>
         {dueCount > 0 && (
           <Link

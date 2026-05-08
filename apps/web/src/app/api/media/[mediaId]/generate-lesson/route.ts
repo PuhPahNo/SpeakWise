@@ -1,6 +1,6 @@
 import { withAuth } from '@/lib/api/route-handler';
-import { prisma } from '@speakwise/db';
 import { generateLesson } from '@/server/services/lesson';
+import { prisma } from '@speakwise/db';
 
 export async function POST(_req: Request, { params }: { params: Promise<{ mediaId: string }> }) {
   const { mediaId } = await params;

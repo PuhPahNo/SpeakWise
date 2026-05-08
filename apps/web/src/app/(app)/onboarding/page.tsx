@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { VoiceOrb } from '@/components/voice/voice-orb';
 import { useVoiceTutor } from '@/hooks/use-voice-tutor';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 
 type Phase = 'intro' | 'conversing' | 'done';
 
@@ -195,7 +195,6 @@ export default function OnboardingPage() {
               className="w-full max-w-md flex gap-2"
             >
               <input
-                autoFocus
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
                 placeholder="Type your answer instead…"

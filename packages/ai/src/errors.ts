@@ -1,7 +1,7 @@
 export class AIError extends Error {
   readonly provider: string;
   readonly purpose: string;
-  readonly cause?: unknown;
+  override readonly cause?: unknown;
   constructor(opts: { provider: string; purpose: string; message: string; cause?: unknown }) {
     super(opts.message);
     this.name = 'AIError';

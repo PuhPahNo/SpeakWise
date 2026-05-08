@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { authenticate } from './_helpers';
 
 test.describe('voice autoplay gate (Wise should not speak before user gesture)', () => {
@@ -26,9 +26,7 @@ test.describe('voice autoplay gate (Wise should not speak before user gesture)',
     ).toEqual([]);
 
     // Intro copy should be visible.
-    await expect(
-      page.getByText(/Tap the orb when you[’']re ready/i),
-    ).toBeVisible();
+    await expect(page.getByText(/Tap the orb when you[’']re ready/i)).toBeVisible();
   });
 
   test('command-center shows greeting text but does NOT POST /api/voice/speak on load', async ({

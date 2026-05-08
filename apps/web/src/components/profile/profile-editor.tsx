@@ -32,8 +32,14 @@ export function ProfileEditor({ profile }: { profile: Profile }) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          goals: goals.split(',').map((s) => s.trim()).filter(Boolean),
-          interests: interests.split(',').map((s) => s.trim()).filter(Boolean),
+          goals: goals
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
+          interests: interests
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
           currentLevel: level,
           preferredCorrectionStyle: correctionStyle,
           preferredSessionLengthMinutes: Number(duration),

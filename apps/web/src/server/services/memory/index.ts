@@ -1,7 +1,8 @@
-import { prisma } from '@speakwise/db';
-import { embed, chatStructured, Models } from '@speakwise/ai';
-import { MemoryExtractionOutputSchema, type MemoryCandidate } from '@speakwise/schemas';
+import { Models, chatStructured, embed } from '@speakwise/ai';
+import { Prisma, prisma } from '@speakwise/db';
 import { emitUserEvent } from '@speakwise/events';
+import { MemoryExtractionOutputSchema } from '@speakwise/schemas';
+import type { MemoryCandidate } from '@speakwise/types';
 
 const MIN_CONFIDENCE_TO_PERSIST = 0.5;
 
@@ -27,17 +28,18 @@ export async function applyMemoryCandidates(
         content: c.content,
         confidence: c.confidence,
         visibility: c.visibility,
-        structuredData: (c.structuredData ?? null) as object | null,
+        structuredData: c.structuredData
+          ? (JSON.parse(JSON.stringify(c.structuredData)) as Prisma.InputJsonValue)
+          : Prisma.JsonNull,
         sourceSessionId: opts.sourceSessionId ?? null,
         sourceResponseId: opts.sourceResponseId ?? null,
-        embeddingId: null,
         isActive: true,
       },
     });
 
     if (embedding) {
       await prisma.$executeRawUnsafe(
-        `UPDATE memory_notes SET embedding = $1::vector WHERE id = $2::uuid`,
+        'UPDATE memory_notes SET embedding = $1::vector WHERE id = $2::uuid',
         `[${embedding.join(',')}]`,
         note.id,
       );
@@ -52,7 +54,10 @@ export async function applyMemoryCandidates(
   }
 }
 
-export async function listMemory(userId: string, opts?: { visibility?: 'user_visible' | 'internal' }) {
+export async function listMemory(
+  userId: string,
+  opts?: { visibility?: 'user_visible' | 'internal' },
+) {
   return prisma.memoryNote.findMany({
     where: {
       userId,
@@ -94,20 +99,18 @@ export async function listGroupedMemory(userId: string): Promise<GroupedMemory> 
     orderBy: { updatedAt: 'desc' },
   });
 
-  const groups = (Object.keys(MEMORY_GROUPS) as Array<keyof typeof MEMORY_GROUPS>).map(
-    (key) => {
-      const types = MEMORY_GROUPS[key];
-      const notes = all
-        .filter((n) => types.includes(n.type))
-        .map((n) => ({
-          id: n.id,
-          content: n.content,
-          confidence: Number(n.confidence),
-          updatedAt: n.updatedAt.toISOString(),
-        }));
-      return { key, label: GROUP_LABELS[key], notes };
-    },
-  );
+  const groups = (Object.keys(MEMORY_GROUPS) as Array<keyof typeof MEMORY_GROUPS>).map((key) => {
+    const types = MEMORY_GROUPS[key];
+    const notes = all
+      .filter((n) => types.includes(n.type))
+      .map((n) => ({
+        id: n.id,
+        content: n.content,
+        confidence: Number(n.confidence),
+        updatedAt: n.updatedAt.toISOString(),
+      }));
+    return { key, label: GROUP_LABELS[key], notes };
+  });
 
   return { groups, totalActive: all.length };
 }
@@ -129,17 +132,22 @@ export async function retrieveRelevantMemories(userId: string, query: string, k 
   }
 
   // pgvector cosine distance search
-  const rows: Array<{ id: string; type: string; content: string; visibility: string; confidence: number }> =
-    await prisma.$queryRawUnsafe(
-      `SELECT id, type, content, visibility, confidence
+  const rows: Array<{
+    id: string;
+    type: string;
+    content: string;
+    visibility: string;
+    confidence: number;
+  }> = await prisma.$queryRawUnsafe(
+    `SELECT id, type, content, visibility, confidence
        FROM memory_notes
        WHERE user_id = $1::uuid AND is_active = true AND embedding IS NOT NULL
        ORDER BY embedding <=> $2::vector
        LIMIT $3`,
-      userId,
-      `[${queryEmbedding.join(',')}]`,
-      k,
-    );
+    userId,
+    `[${queryEmbedding.join(',')}]`,
+    k,
+  );
   return rows;
 }
 
@@ -152,11 +160,13 @@ export async function extractFromSession(userId: string, sessionId: string) {
 
   const profile = await prisma.learnerProfile.findUnique({ where: { userId } });
 
-  const transcript = session.transcript ?? session.responses.map((r) => ({
-    role: 'user',
-    text: r.userAnswer,
-    correction: r.corrections[0]?.explanation,
-  }));
+  const transcript =
+    session.transcript ??
+    session.responses.map((r) => ({
+      role: 'user',
+      text: r.userAnswer,
+      correction: r.corrections[0]?.explanation,
+    }));
 
   const result = await chatStructured({
     promptKey: 'memory.extract',

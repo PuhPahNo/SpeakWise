@@ -1,6 +1,6 @@
 import { withAuth, withAuthAndJson } from '@/lib/api/route-handler';
-import { VocabularyCreateSchema, VocabularyQuerySchema } from '@speakwise/schemas';
 import { createVocabulary, listVocabulary } from '@/server/services/vocabulary';
+import { VocabularyCreateSchema, VocabularyQuerySchema } from '@speakwise/schemas';
 
 export async function GET(req: Request) {
   return withAuth(async ({ userId }) => {

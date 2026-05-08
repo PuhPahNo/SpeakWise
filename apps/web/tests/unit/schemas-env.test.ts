@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { ServerEnvSchema, PublicEnvSchema } from '@speakwise/schemas';
+import { PublicEnvSchema, ServerEnvSchema } from '@speakwise/schemas';
+import { describe, expect, it } from 'vitest';
 
 const VALID_SERVER = {
   APP_URL: 'http://localhost:3001',

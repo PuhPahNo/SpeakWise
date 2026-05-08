@@ -1,12 +1,6 @@
 import type { CEFRLevel, Decimal, ISODateTime, UUID } from './primitives';
 
-export const LEARNING_STYLES = [
-  'mission',
-  'tutor',
-  'conversation',
-  'drill',
-  'balanced',
-] as const;
+export const LEARNING_STYLES = ['mission', 'tutor', 'conversation', 'drill', 'balanced'] as const;
 export type LearningStyle = (typeof LEARNING_STYLES)[number];
 
 export const CORRECTION_STYLES = [

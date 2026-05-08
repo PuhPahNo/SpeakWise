@@ -1,7 +1,7 @@
+import { UnauthenticatedError, getOrCreateUser } from '@/lib/auth/current-user';
+import { AIError, AISchemaValidationError } from '@speakwise/ai';
 import { NextResponse } from 'next/server';
 import type { ZodTypeAny, z } from 'zod';
-import { UnauthenticatedError, getOrCreateUser } from '@/lib/auth/current-user';
-import { AISchemaValidationError, AIError } from '@speakwise/ai';
 
 export interface AuthedContext {
   userId: string;

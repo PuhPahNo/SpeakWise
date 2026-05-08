@@ -1,4 +1,4 @@
-import { prisma, type SkillStatus } from '@speakwise/db';
+import { type SkillStatus, prisma } from '@speakwise/db';
 
 export async function listSkills(opts?: { level?: string; category?: string }) {
   return prisma.curriculumSkill.findMany({
@@ -48,10 +48,7 @@ export async function getSkillsDueForReview(userId: string, limit = 10) {
   return prisma.userSkillProgress.findMany({
     where: {
       userId,
-      OR: [
-        { nextReviewAt: { lte: new Date() } },
-        { status: 'needs_review' as SkillStatus },
-      ],
+      OR: [{ nextReviewAt: { lte: new Date() } }, { status: 'needs_review' as SkillStatus }],
     },
     include: { skill: true },
     orderBy: { nextReviewAt: 'asc' },

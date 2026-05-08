@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Flame, Sparkles } from 'lucide-react';
+import { useToast } from '@/components/ui/toast';
 import { VoiceOrb } from '@/components/voice/voice-orb';
 import { useVoiceTutor } from '@/hooks/use-voice-tutor';
-import { useToast } from '@/components/ui/toast';
+import { Flame, Sparkles } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 
 interface Props {
   firstName: string;
@@ -145,7 +145,7 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
       // Otherwise: speak the reply and auto-listen for the next turn (default).
       await tutor.speak(data.wiseMessage);
     } catch {
-      const fallback = "Sorry — I missed that. Try again?";
+      const fallback = 'Sorry — I missed that. Try again?';
       setWiseLine(fallback);
       await tutor.speak(fallback);
     } finally {
@@ -163,10 +163,7 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
       });
       if (!gen.ok) {
         const errBody = await gen.json().catch(() => ({}));
-        toast.error(
-          'Couldn’t build that mission',
-          errBody.message ?? 'Try again in a moment.',
-        );
+        toast.error('Couldn’t build that mission', errBody.message ?? 'Try again in a moment.');
         return;
       }
       const out = await gen.json();
@@ -216,8 +213,7 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
     void tutor.toggleListen();
   }
 
-  const dueCount =
-    (greeting?.context.dueSkillCount ?? 0) + (greeting?.context.dueVocabCount ?? 0);
+  const dueCount = (greeting?.context.dueSkillCount ?? 0) + (greeting?.context.dueVocabCount ?? 0);
 
   return (
     <div className="flex flex-col items-center gap-7 sm:gap-9">
@@ -230,9 +226,7 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
               <span>day{summary.streakDays === 1 ? '' : 's'}</span>
             </span>
           )}
-          {summary.streakDays > 0 && summary.xpTotal > 0 && (
-            <span className="opacity-30">·</span>
-          )}
+          {summary.streakDays > 0 && summary.xpTotal > 0 && <span className="opacity-30">·</span>}
           {summary.xpTotal > 0 && (
             <span className="inline-flex items-center gap-1.5">
               <Sparkles size={14} className="text-wise-400" aria-hidden />
@@ -247,12 +241,7 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
         Welcome back, {firstName}.
       </h1>
 
-      <VoiceOrb
-        state={tutor.state}
-        size="lg"
-        amplitude={tutor.amplitude}
-        onTap={onOrbTap}
-      />
+      <VoiceOrb state={tutor.state} size="lg" amplitude={tutor.amplitude} onTap={onOrbTap} />
 
       <div className="text-center min-h-[5rem] max-w-xl">
         {wiseLine ? (

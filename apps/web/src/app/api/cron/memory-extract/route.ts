@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@speakwise/db';
 import { extractFromSession } from '@/server/services/memory';
+import { prisma } from '@speakwise/db';
+import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

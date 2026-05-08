@@ -1,8 +1,8 @@
-import { z } from 'zod';
-import { prisma, type SessionMode, type CEFRLevel } from '@speakwise/db';
 import { Models, chatStructured } from '@speakwise/ai';
-import { PlacementAssessmentOutputSchema } from '@speakwise/schemas';
+import { type CEFRLevel, type SessionMode, prisma } from '@speakwise/db';
 import { emitUserEvent } from '@speakwise/events';
+import { PlacementAssessmentOutputSchema } from '@speakwise/schemas';
+import { z } from 'zod';
 import { ensureProfile, updateProfile } from '../profile';
 
 const ONBOARDING_FIELDS = [
@@ -32,14 +32,7 @@ const OnboardingTurnSchema = z.object({
       .optional(),
     preferredSessionLengthMinutes: z.number().int().min(2).max(60).optional(),
     preferredCorrectionStyle: z
-      .enum([
-        'gentle',
-        'direct',
-        'strict',
-        'end_of_task',
-        'major_mistakes_only',
-        'adaptive',
-      ])
+      .enum(['gentle', 'direct', 'strict', 'end_of_task', 'major_mistakes_only', 'adaptive'])
       .optional(),
     preferredWisePersonality: z
       .enum([
@@ -70,25 +63,17 @@ export async function startOnboarding(userId: string, mode: SessionMode) {
   const firstName = user.name.split(' ')[0] ?? user.name;
   return {
     sessionId: session.id,
-    wiseMessage:
-      `Ciao ${firstName}, I'm Wise. I'll be your Italian tutor. ` +
-      `In a minute or two I'll learn enough about you to build a plan that fits — ` +
-      `let's start: what's drawing you to Italian?`,
+    wiseMessage: `Ciao ${firstName}, I'm Wise. I'll be your Italian tutor. In a minute or two I'll learn enough about you to build a plan that fits — let's start: what's drawing you to Italian?`,
   };
 }
 
-export async function respondOnboarding(
-  userId: string,
-  sessionId: string,
-  text: string,
-) {
+export async function respondOnboarding(userId: string, sessionId: string, text: string) {
   const session = await prisma.session.findFirst({
     where: { id: sessionId, userId, sessionType: 'onboarding' },
   });
   if (!session) throw new Error('Onboarding session not found');
 
-  const transcript =
-    (session.transcript as Array<{ role: string; text: string }> | null) ?? [];
+  const transcript = (session.transcript as Array<{ role: string; text: string }> | null) ?? [];
   transcript.push({ role: 'user', text });
 
   const profile = await prisma.learnerProfile.findUniqueOrThrow({
@@ -191,11 +176,7 @@ export async function respondOnboarding(
   };
 }
 
-export async function placementAssess(
-  userId: string,
-  responses: string[],
-  skillSlugs: string[],
-) {
+export async function placementAssess(userId: string, responses: string[], skillSlugs: string[]) {
   const result = await chatStructured({
     promptKey: 'placement.assess',
     purpose: 'placement.assess',

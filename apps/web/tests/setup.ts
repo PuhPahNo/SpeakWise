@@ -1,8 +1,8 @@
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 // Vitest global setup. Loads .env from the monorepo root so tests can
 // see DATABASE_URL, OPENAI_API_KEY, etc.
 import { config } from 'dotenv';
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const root = resolve(here, '../../..');

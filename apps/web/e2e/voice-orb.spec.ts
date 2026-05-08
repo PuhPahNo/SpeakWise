@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { authenticate } from './_helpers';
 
 test.describe('voice orb presence', () => {

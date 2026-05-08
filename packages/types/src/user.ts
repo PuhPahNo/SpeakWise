@@ -1,12 +1,6 @@
 import type { ISODateTime, Language, UUID } from './primitives';
 
-export const USER_ROLES = [
-  'learner',
-  'admin',
-  'tutor',
-  'student',
-  'organization_admin',
-] as const;
+export const USER_ROLES = ['learner', 'admin', 'tutor', 'student', 'organization_admin'] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
 export interface User {

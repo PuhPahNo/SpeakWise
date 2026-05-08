@@ -1,6 +1,6 @@
 import { withAuth } from '@/lib/api/route-handler';
-import { ensureProfile } from '@/server/services/profile';
 import { generateLesson } from '@/server/services/lesson';
+import { ensureProfile } from '@/server/services/profile';
 
 export async function POST() {
   return withAuth(async ({ userId }) => {

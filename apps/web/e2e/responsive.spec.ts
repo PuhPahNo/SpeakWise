@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { authenticate } from './_helpers';
 
 test('mobile: bottom tab bar is visible', async ({ page, context, baseURL }, testInfo) => {
@@ -11,7 +11,11 @@ test('mobile: bottom tab bar is visible', async ({ page, context, baseURL }, tes
   }
 });
 
-test('mobile: page does not horizontally overflow the viewport', async ({ page, context, baseURL }, testInfo) => {
+test('mobile: page does not horizontally overflow the viewport', async ({
+  page,
+  context,
+  baseURL,
+}, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile', 'mobile-only');
   await authenticate(context, baseURL!);
   await page.goto('/lessons');
@@ -25,7 +29,11 @@ test('mobile: page does not horizontally overflow the viewport', async ({ page, 
   expect(overflow.overflow, JSON.stringify(overflow)).toBeLessThanOrEqual(1);
 });
 
-test('desktop: top nav is visible (md breakpoint shows it)', async ({ page, context, baseURL }, testInfo) => {
+test('desktop: top nav is visible (md breakpoint shows it)', async ({
+  page,
+  context,
+  baseURL,
+}, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'desktop-only');
   await authenticate(context, baseURL!);
   await page.goto('/lessons');

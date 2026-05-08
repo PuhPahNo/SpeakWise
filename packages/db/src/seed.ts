@@ -54,10 +54,24 @@ async function main() {
 
   console.log('▶ Seeding prompt templates…');
   for (const tpl of promptTemplateSeed) {
+    // Prisma's Json input is structurally narrower than Record<string, unknown>;
+    // serializing through JSON.parse(JSON.stringify(...)) coerces it to a
+    // value Prisma accepts.
+    const outputSchema = tpl.outputSchema
+      ? JSON.parse(JSON.stringify(tpl.outputSchema))
+      : undefined;
     await prisma.promptTemplate.upsert({
       where: { key_version: { key: tpl.key, version: tpl.version } },
       update: { body: tpl.body, purpose: tpl.purpose, isEnabled: true },
-      create: { ...tpl, isEnabled: true },
+      create: {
+        key: tpl.key,
+        version: tpl.version,
+        purpose: tpl.purpose,
+        body: tpl.body,
+        inputs: tpl.inputs,
+        outputSchema,
+        isEnabled: true,
+      },
     });
   }
   console.log(`✓ Seeded ${promptTemplateSeed.length} prompt templates`);

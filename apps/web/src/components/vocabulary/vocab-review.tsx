@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Check, Volume2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Volume2, Check, X } from 'lucide-react';
+import { useState } from 'react';
 
 interface Card {
   id: string;
@@ -154,9 +154,7 @@ export function VocabReview({ cards }: { cards: Card[] }) {
                 <div className="mt-6 text-sm text-ink-200 italic max-w-md">
                   &ldquo;{card.exampleSentence}&rdquo;
                   {card.exampleTranslation && (
-                    <div className="text-ink-200/70 not-italic mt-1">
-                      {card.exampleTranslation}
-                    </div>
+                    <div className="text-ink-200/70 not-italic mt-1">{card.exampleTranslation}</div>
                   )}
                 </div>
               )}
