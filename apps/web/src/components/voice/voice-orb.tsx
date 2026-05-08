@@ -20,6 +20,10 @@ const SIZE: Record<NonNullable<Props['size']>, string> = {
 };
 
 export function VoiceOrb({ state, size = 'lg', onTap, ariaLabel, amplitude = 0 }: Props) {
+  // The orb only animates during ACTIVE states. At rest, it's perfectly
+  // still — making it a reliable click target. The previous breathe-on-
+  // idle made the hit target jitter (~2px every 2s) AND made Playwright
+  // and real users miss clicks against the moving disc.
   const animation = useMemo(() => {
     switch (state) {
       case 'listening':
@@ -29,24 +33,30 @@ export function VoiceOrb({ state, size = 'lg', onTap, ariaLabel, amplitude = 0 }
         return 'animate-orb-spin-slow';
       case 'speaking':
         return 'animate-orb-breathe';
-      case 'error':
-        return ''; // dim, no animation
       default:
-        return 'animate-orb-breathe';
+        return ''; // idle, paused, awaiting_user_response, error → still
     }
   }, [state]);
 
   const isError = state === 'error';
+  const interactive = !!onTap;
 
   // Dynamic outer glow scales with mic amplitude when listening
   const dynamicGlow = state === 'listening' ? Math.max(0, Math.min(1, amplitude)) : 0;
 
+  // Wrap the button in a slightly larger flex container so we can render
+  // halos as siblings WITHOUT them blocking the click. The halos use
+  // `pointer-events: none` so 100% of taps in the orb area hit the button.
   return (
-    <div className="relative inline-flex items-center justify-center">
-      {/* Outer halo rings — react to listening amplitude (or red on error) */}
+    <div
+      className={`relative inline-flex items-center justify-center ${
+        interactive ? 'cursor-pointer' : ''
+      }`}
+    >
+      {/* Outer halo rings — purely decorative, never receive clicks */}
       <div
         aria-hidden
-        className="absolute inset-0 rounded-full transition-all duration-150"
+        className="pointer-events-none absolute inset-0 rounded-full transition-all duration-150"
         style={{
           transform: `scale(${1.15 + dynamicGlow * 0.25})`,
           background: isError
@@ -57,7 +67,7 @@ export function VoiceOrb({ state, size = 'lg', onTap, ariaLabel, amplitude = 0 }
       />
       <div
         aria-hidden
-        className="absolute inset-0 rounded-full"
+        className="pointer-events-none absolute inset-0 rounded-full"
         style={{
           transform: `scale(${1.35 + dynamicGlow * 0.4})`,
           background: isError
@@ -68,15 +78,17 @@ export function VoiceOrb({ state, size = 'lg', onTap, ariaLabel, amplitude = 0 }
         }}
       />
 
-      {/* The orb itself */}
+      {/* The actual click target — the visible orb plus a generous invisible
+          padding ring. The :active state gives instant tactile feedback so
+          the user feels the tap register before any network round-trip. */}
       <button
         type="button"
         onClick={onTap}
         disabled={!onTap}
         aria-label={ariaLabel ?? `Voice orb, ${state.replace(/_/g, ' ')}`}
         className={`relative ${SIZE[size]} rounded-full ${animation} ${
-          onTap ? 'cursor-pointer' : 'cursor-default'
-        } ${isError ? '' : 'shadow-orb-glow'} focus:outline-none focus-visible:shadow-orb-glow-active transition-all duration-300`}
+          interactive ? 'cursor-pointer hover:brightness-110 active:scale-[0.97]' : 'cursor-default'
+        } ${isError ? '' : 'shadow-orb-glow'} focus:outline-none focus-visible:shadow-orb-glow-active transition-[transform,filter,box-shadow] duration-150`}
         style={{
           background: isError
             ? 'radial-gradient(circle at 32% 28%, rgba(120,40,40,0.85), rgba(70,20,20,0.95) 60%, rgba(30,10,10,1) 100%)'
@@ -87,7 +99,7 @@ export function VoiceOrb({ state, size = 'lg', onTap, ariaLabel, amplitude = 0 }
         {/* Inner highlight */}
         <span
           aria-hidden
-          className="absolute inset-[14%] rounded-full"
+          className="pointer-events-none absolute inset-[14%] rounded-full"
           style={{
             background:
               'radial-gradient(circle at 35% 30%, rgba(255,255,255,0.55), rgba(255,255,255,0) 55%)',
@@ -97,7 +109,7 @@ export function VoiceOrb({ state, size = 'lg', onTap, ariaLabel, amplitude = 0 }
         {/* Inner shadow rim for depth */}
         <span
           aria-hidden
-          className="absolute inset-0 rounded-full"
+          className="pointer-events-none absolute inset-0 rounded-full"
           style={{
             boxShadow:
               'inset 0 -16px 30px rgba(0,0,0,0.45), inset 0 12px 24px rgba(255,231,178,0.25)',
