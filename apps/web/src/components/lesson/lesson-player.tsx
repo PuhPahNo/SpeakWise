@@ -51,12 +51,28 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
 
   const briefing = (lesson.content as { briefing?: string } | null)?.briefing ?? '';
 
+  // STT language is task-aware:
+  //   - speaking_prompt / translation / roleplay / scenario_roleplay /
+  //     listening_comprehension: learner is producing Italian → 'it'
+  //   - multiple_choice / fill_blank: typed, no STT → doesn't matter
+  //   - everything else / unknown: 'auto' so a casual English aside
+  //     ("can you say that again?") still transcribes.
+  const currentTaskTypeForStt = tasks[taskIndex]?.taskType ?? '';
+  const sttLang: 'it' | 'auto' =
+    currentTaskTypeForStt === 'speaking_prompt' ||
+    currentTaskTypeForStt === 'translation' ||
+    currentTaskTypeForStt === 'roleplay' ||
+    currentTaskTypeForStt === 'scenario_roleplay' ||
+    currentTaskTypeForStt === 'listening_comprehension'
+      ? 'it'
+      : 'auto';
+
   const tutor = useVoiceTutor({
-    // STT 'it' so learner's Italian answers are transcribed correctly.
     // TTS 'auto' so Wise's mixed English/Italian narration (briefings,
     // task prompts that quote Italian, recap lines) lands with correct
-    // Italian phonetics on the Italian fragments.
-    sttLanguage: 'it',
+    // Italian phonetics on the Italian fragments. STT switches per task
+    // — see currentTaskTypeForStt above.
+    sttLanguage: sttLang,
     ttsLanguage: 'auto',
     onUserSpeech: async (text) => {
       setAnswer(text);

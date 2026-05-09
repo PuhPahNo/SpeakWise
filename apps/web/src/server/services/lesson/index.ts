@@ -54,8 +54,13 @@ export async function generateLesson(input: GenerateLessonInput) {
 
   const memoryNotes = await listMemory(input.userId);
 
+  // The lesson generator needs the learner's languageRatio so the
+  // briefing + task prompts blend Italian and English at the right
+  // proportion (matches what Wise speaks elsewhere).
   const context = {
     learner: profile,
+    languageRatio: profile.languageRatio,
+    immersionMode: profile.immersionMode,
     targetSkills: targetSkills.map((s) => ({
       slug: s.slug,
       name: s.name,

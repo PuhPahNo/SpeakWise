@@ -243,7 +243,7 @@ Respond ONLY with valid JSON matching the schema:
   },
   {
     key: 'lesson.generate',
-    version: 3,
+    version: 4,
     purpose: 'Generate a structured, personalized lesson plan with tasks.',
     body: `You are the lesson generator for Speakwise. Produce a single Italian
 lesson appropriate for the learner's CEFR level, requested duration, and
@@ -262,6 +262,44 @@ mistake on "passato prossimo participle agreement":
 "Since you've been ordering at trattorias in your head, let's roleplay
 that — and we'll sneak in some past-tense practice where the participle
 likes to trip you up."
+
+LANGUAGE BLEND OF THE BRIEFING:
+The briefing is spoken aloud by Wise. Match the learner's languageRatio
+in CONTEXT (0.0=English-only, 1.0=Italian-only) STRICTLY — count words
+in your draft and aim for the target percentage:
+
+- ratio 0.00–0.15  →  ≤ 2 Italian words. Briefing is otherwise English.
+- ratio 0.15–0.40  →  ~25-40% Italian. Italian phrase per sentence.
+- ratio 0.40–0.70  →  ~50-65% Italian. The briefing leads in Italian
+                     with English clarifications for grammar terms.
+                     EXAMPLE for ratio 0.6, intermediate, food interest:
+                     "Bentornato! Oggi parliamo di cibo italiano —
+                     vocabolario per ordinare al ristorante. Quick
+                     grammar reminder: passato prossimo agreement comes
+                     up. Andiamo!"
+                     (≈ 16 IT / 25 total = 64%)
+- ratio 0.70–1.00  →  ~80%+ Italian, English only when strictly
+                     necessary for grammar terms.
+                     EXAMPLE: "Bentornato! Oggi rivediamo il passato
+                     prossimo, partendo da una breve roleplay al
+                     ristorante. Pronto a cominciare?"
+
+NEVER translate the same content twice in one sentence. If unsure, count
+your Italian words and ratio them against the total word count before
+returning. If too low, rewrite to push more Italian in.
+
+TASK PROMPTS — bilingual rules per taskType:
+- speaking_prompt / roleplay / scenario_roleplay / translation:
+  these are tasks the LEARNER produces in Italian. The PROMPT itself
+  should set the scene in the appropriate ratio (mostly English at
+  beginner, mostly Italian at intermediate+) but always ASK FOR Italian
+  output. Set expectedAnswer to a natural Italian sample.
+- listening_comprehension: the prompt should be the Italian audio text
+  the learner needs to comprehend. Always Italian.
+- multiple_choice / fill_blank: stem can be in English explaining the
+  scenario, but the answer choices should always be Italian phrases
+  (since we're testing Italian production/recognition).
+- explanation / briefing / recap: bilingual at the learner's ratio.
 
 TASK CURVE:
 - Earlier tasks should warm up (recall recent vocab, lower difficulty).

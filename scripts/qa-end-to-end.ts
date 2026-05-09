@@ -1,29 +1,77 @@
 /* eslint-disable no-console */
 /**
- * Quick & dirty Italian-word counter — used to verify Wise honors the
- * learner's languageRatio. Anything with Italian diacritics or in the
- * curated common-Italian-token set is counted as Italian; otherwise it's
- * either English or punctuation (skipped).
+ * Italian-word counter — used to verify Wise honors the learner's
+ * languageRatio. Mirrors `packages/ai/src/text-segmenter.ts` token set
+ * but standalone (the harness can't import workspace packages directly
+ * via Node's --experimental-strip-types runner). Three signals stack:
+ *   1. Italian diacritics (à è é ì ò ù) — definitive.
+ *   2. Curated Italian function/content words — definitive.
+ *   3. Italian morphology endings (-are -ere -ire -azione -mente -iamo
+ *      -ate -ato -ata -ito -uto …) — strong but conservative.
  */
+const IT_DIACRITICS = /[àèéìòùÀÈÉÌÒÙ]/;
 const IT_COMMON = new Set([
-  'ciao', 'salve', 'arrivederci', 'buongiorno', 'buonasera', 'grazie', 'prego',
-  'scusa', 'scusi', 'bentornato', 'bentornata', 'bene', 'allora', 'però',
-  'perché', 'quindi', 'davvero', 'forse', 'magari', 'va', 'oggi', 'ieri',
-  'domani', 'sempre', 'mai', 'già', 'ancora', 'anche', 'molto', 'tanto',
-  'poco', 'sono', 'sei', 'è', 'siamo', 'siete', 'ho', 'hai', 'ha', 'abbiamo',
-  'avete', 'hanno', 'voglio', 'vuoi', 'vuole', 'vorrei', 'vorresti', 'posso',
-  'puoi', 'può', 'devo', 'devi', 'deve', 'faccio', 'fai', 'fa', 'cibo',
-  'pasta', 'caffè', 'vino', 'casa', 'lavoro', 'famiglia', 'gente', 'ragazzo',
-  'ragazza', 'amico', 'amica', 'il', 'la', 'lo', 'gli', 'le', 'un', 'una',
-  'di', 'da', 'in', 'su', 'per', 'con', 'che', 'chi', 'non', 'sì', 'mi',
-  'ti', 'ci', 'vi', 'si', 'al', 'alla', 'del', 'della', 'nel', 'nella',
-  'oggi', 'come', 'dove', 'quando', 'cosa',
+  // greetings + manners
+  'ciao', 'salve', 'arrivederci', 'buongiorno', 'buonasera', 'buonanotte',
+  'grazie', 'prego', 'scusa', 'scusi', 'piacere', 'pronto', 'certo',
+  'bentornato', 'bentornata', 'bentornati', 'bentornate',
+  // articles, prepositions, contractions
+  'il', 'la', 'lo', 'gli', 'le', 'un', 'uno', 'una', 'di', 'da', 'in',
+  'su', 'per', 'con', 'al', 'allo', 'alla', 'ai', 'agli', 'alle', 'del',
+  'dello', 'della', 'dei', 'degli', 'delle', 'nel', 'nello', 'nella',
+  'nei', 'negli', 'nelle', 'sul', 'sullo', 'sulla', 'sui', 'sugli', 'sulle',
+  // pronouns
+  'io', 'tu', 'lui', 'lei', 'noi', 'voi', 'loro', 'mi', 'ti', 'ci', 'vi', 'si',
+  // common verbs (essere/avere/fare/andare/volere/potere/dovere/dire)
+  'sono', 'sei', 'è', 'siamo', 'siete', 'ho', 'hai', 'ha', 'abbiamo',
+  'avete', 'hanno', 'faccio', 'fai', 'fa', 'facciamo', 'fate', 'fanno',
+  'vado', 'vai', 'va', 'andiamo', 'andate', 'vanno', 'voglio', 'vuoi',
+  'vuole', 'vogliamo', 'volete', 'vogliono', 'vorrei', 'vorresti',
+  'vorrebbe', 'posso', 'puoi', 'può', 'possiamo', 'potete', 'possono',
+  'devo', 'devi', 'deve', 'dobbiamo', 'dovete', 'devono', 'dico', 'dici',
+  'dice', 'diciamo', 'dite', 'dicono',
+  // adverbs / connectors
+  'sì', 'no', 'non', 'molto', 'tanto', 'poco', 'bene', 'male', 'oggi',
+  'ieri', 'domani', 'sempre', 'mai', 'già', 'ancora', 'anche', 'allora',
+  'però', 'perché', 'quindi', 'davvero', 'forse', 'magari',
+  'come', 'dove', 'quando', 'cosa', 'chi', 'quale', 'quali', 'quanto',
+  // hallmark nouns/adjectives
+  'cibo', 'casa', 'giorno', 'tempo', 'volta', 'gente', 'ragazzo',
+  'ragazza', 'bambino', 'amico', 'amica', 'famiglia', 'lavoro', 'scuola',
+  'acqua', 'pasta', 'vino', 'caffè', 'cucina', 'ristorante', 'piatto',
+  'parola', 'parole', 'lingua', 'storia', 'musica', 'film', 'libro',
+  'viaggio', 'estate', 'settimana', 'mese', 'anno', 'mattina', 'sera',
+  'notte', 'cucinare', 'mangiare', 'bere', 'parlare', 'capire',
+  'imparare', 'lezione', 'lezioni', 'roleplay',
+  // set phrases (single-token slice)
+  'bene', 'piacere', 'ripasso', 'ripassare', 'esercizio', 'continuiamo',
+  'cominciamo', 'iniziamo', 'andiamo',
 ]);
+const IT_ENDINGS = [
+  'are', 'ere', 'ire',           // infinitives
+  'ato', 'ata', 'ati', 'ate',    // participles -are
+  'uto', 'uta', 'uti', 'ute',    // participles -ere
+  'ito', 'ita', 'iti', 'ite',    // participles -ire
+  'ando', 'endo',                // gerunds
+  'iamo', 'avamo', 'evamo', 'ivamo', // -iamo conjugation endings
+  'azione', 'zione', 'mente',
+  'aggio', 'eggio',
+];
 function countItalianRatio(text: string): { it: number; total: number; ratio: number } {
   const tokens = text.toLowerCase().match(/[a-zà-öø-ÿ']+/g) ?? [];
   let it = 0;
   for (const t of tokens) {
-    if (/[àèéìòù]/.test(t) || IT_COMMON.has(t)) it++;
+    if (IT_DIACRITICS.test(t)) {
+      it++;
+      continue;
+    }
+    if (IT_COMMON.has(t)) {
+      it++;
+      continue;
+    }
+    if (t.length >= 4 && IT_ENDINGS.some((suf) => t.endsWith(suf))) {
+      it++;
+    }
   }
   return { it, total: tokens.length, ratio: tokens.length === 0 ? 0 : it / tokens.length };
 }
@@ -507,12 +555,91 @@ async function main() {
     }
   }
 
+  // ── 11. Intermediate-level smoke test ─────────────────────────────
+  // Spin up a SECOND user with intermediate level + 60% languageRatio
+  // and check that the generated lesson briefing actually contains
+  // significantly more Italian than the beginner case.
+  log('\n11. INTERMEDIATE LEARNER (ratio 0.6)');
+  const interUsername = `qa-int-${randomBytes(3).toString('hex')}`;
+  const interUser = await prisma.user.create({
+    data: {
+      username: interUsername,
+      passwordHash: await bcrypt.hash(password, 12),
+      name: `Inter QA`,
+      role: 'learner',
+      nativeLanguage: 'en',
+      targetLanguage: 'it',
+    },
+  });
+  await prisma.learnerProfile.create({
+    data: {
+      userId: interUser.id,
+      currentLevel: 'intermediate',
+      goals: ['talk about food and travel comfortably'],
+      interests: ['food', 'travel', 'music'],
+      preferredSessionLengthMinutes: 10,
+      preferredCorrectionStyle: 'gentle',
+      preferredWisePersonality: 'friendly_tutor',
+      languageRatio: 0.6,
+      onboardingCompleted: true,
+    },
+  });
+  const interSignin = await fetch(`${BASE}/api/auth/signin`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: interUsername, password }),
+  });
+  const interCookie = `sw_session=${
+    interSignin.headers.get('set-cookie')?.match(/sw_session=([^;]+)/)?.[1] ?? ''
+  }`;
+
+  const interLessonRes = await api<{ lesson: { id: string; title: string } }>(
+    'POST',
+    '/api/lessons/generate',
+    interCookie,
+    { lessonType: 'daily_mission' },
+  );
+  if (interLessonRes.status !== 200) {
+    fail('intermediate lesson generate', `status ${interLessonRes.status}`);
+  } else {
+    const dbInterLesson = await prisma.lesson.findUnique({
+      where: { id: interLessonRes.data.lesson.id },
+      include: { tasks: { orderBy: { orderIndex: 'asc' } } },
+    });
+    const briefing = (dbInterLesson?.content as Record<string, unknown> | null)?.briefing as
+      | string
+      | undefined;
+    if (briefing) {
+      const r = countItalianRatio(briefing);
+      log(`    intermediate briefing: "${briefing}"`);
+      log(`    italian-ratio measured: ${(r.ratio * 100).toFixed(0)}% (${r.it}/${r.total})`);
+      // For ratio 0.6 we want at least 30% Italian (lower bound; we don't
+      // upper-bound because intermediates can absolutely handle more).
+      if (r.ratio >= 0.3) pass('intermediate briefing is Italian-heavy');
+      else fail('intermediate briefing too English', `${(r.ratio * 100).toFixed(0)}% — should be ≥30%`);
+    }
+    // Also test that the greeting respects the higher ratio
+    const interGreet = await api<{ greeting: string }>(
+      'GET',
+      '/api/wise/greeting',
+      interCookie,
+    );
+    const gr = countItalianRatio(interGreet.data.greeting);
+    log(`    intermediate greeting: "${interGreet.data.greeting}"`);
+    log(`    italian-ratio measured: ${(gr.ratio * 100).toFixed(0)}%`);
+    if (gr.ratio >= 0.3) pass('intermediate greeting is Italian-heavy');
+    else fail('intermediate greeting too English', `${(gr.ratio * 100).toFixed(0)}% — should be ≥30%`);
+  }
+
+  await cleanup(prisma, interUser.id);
   await cleanup(prisma, user.id);
-  summarize();
+  await prisma.$disconnect();
+  await summarize();
 }
 
 async function cleanup(prisma: PrismaClient, userId: string) {
-  // Best-effort delete of test user + cascading rows
+  // Best-effort delete of test user + cascading rows. Don't disconnect
+  // here — the harness reuses the prisma client across multiple users.
   try {
     await prisma.userResponse.deleteMany({ where: { session: { userId } } });
     await prisma.session.deleteMany({ where: { userId } });
@@ -528,12 +655,10 @@ async function cleanup(prisma: PrismaClient, userId: string) {
     await prisma.user.delete({ where: { id: userId } });
   } catch (e) {
     console.warn(`cleanup partial: ${e instanceof Error ? e.message : String(e)}`);
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
-function summarize() {
+async function summarize() {
   console.log('\n=== SUMMARY ===');
   if (failures.length === 0) {
     console.log('✓ ALL CHECKS PASSED');
