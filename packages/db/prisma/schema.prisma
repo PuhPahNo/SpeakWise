@@ -269,6 +269,12 @@ model LearnerProfile {
   motivationNotes                 String?         @map("motivation_notes") @db.Text
   /// ElevenLabs voice ID. Null = use app default (see packages/ai/src/voices.ts).
   wiseVoiceId                     String?         @map("wise_voice_id")
+  /// What share of Wise's spoken output should be Italian. 0.0 = English-only,
+  /// 1.0 = full immersion. Default scales by level (see profile service).
+  /// Beginner default is 0.1 — Italian only for already-covered material.
+  languageRatio                   Decimal         @default(0.1) @map("language_ratio") @db.Decimal(3, 2)
+  /// Hard "Italian-only" toggle. Overrides languageRatio when true.
+  immersionMode                   Boolean         @default(false) @map("immersion_mode")
   onboardingCompleted             Boolean         @default(false) @map("onboarding_completed")
   createdAt                       DateTime        @default(now()) @map("created_at")
   updatedAt                       DateTime        @updatedAt @map("updated_at")

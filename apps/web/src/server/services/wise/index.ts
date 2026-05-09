@@ -24,11 +24,24 @@ export async function wiseTurn(userId: string, req: WiseMessageRequest) {
     select: { id: true, sessionType: true, summary: true, completedAt: true },
   });
 
+  // Surface up to ~30 vocab items the learner has actually covered, so
+  // beginner-ratio prompts can sprinkle Italian *they recognize* rather
+  // than throwing new words at them mid-sentence.
+  const coveredVocab = await prisma.vocabularyItem.findMany({
+    where: { userId },
+    orderBy: [{ lastReviewedAt: 'desc' }, { createdAt: 'desc' }],
+    take: 30,
+    select: { targetText: true },
+  });
+
   const context = {
     learner: profile,
+    languageRatio: profile?.languageRatio ?? 0.1,
+    immersionMode: profile?.immersionMode ?? false,
     activeSkills: activeSkills.slice(0, 8).map((s) => ({ slug: s.slug, name: s.name })),
     skillsDueForReview: dueSkills.map((d) => ({ slug: d.skill.slug, name: d.skill.name })),
     vocabularyDueCount: dueVocab.length,
+    coveredVocabulary: coveredVocab.map((v) => v.targetText),
     recentSessions,
     relevantMemories: memories.map((m) => ({ type: m.type, content: m.content })),
     currentScreen: req.context?.screen ?? null,
@@ -143,6 +156,15 @@ export async function generateGreeting(userId: string): Promise<GreetingResult> 
 
   const firstName = user.name.split(' ')[0] ?? user.name;
 
+  // Pull learner's covered vocab so beginner-ratio greetings only sprinkle
+  // Italian the learner actually knows.
+  const coveredVocab = await prisma.vocabularyItem.findMany({
+    where: { userId },
+    orderBy: [{ lastReviewedAt: 'desc' }, { createdAt: 'desc' }],
+    take: 30,
+    select: { targetText: true },
+  });
+
   const ctx = {
     learner: {
       name: firstName,
@@ -151,6 +173,9 @@ export async function generateGreeting(userId: string): Promise<GreetingResult> 
       interests: profile?.interests ?? [],
       preferredPersonality: profile?.preferredWisePersonality ?? 'default',
     },
+    languageRatio: profile?.languageRatio ?? 0.1,
+    immersionMode: profile?.immersionMode ?? false,
+    coveredVocabulary: coveredVocab.map((v) => v.targetText),
     lastSessionAgoDays,
     lastSessionSummary: recentSessions[0]?.summary ?? null,
     lastSessionWeaknesses: recentSessions[0]?.weaknessesObserved ?? [],

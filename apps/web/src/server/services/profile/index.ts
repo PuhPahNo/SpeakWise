@@ -27,6 +27,35 @@ export interface WiseProfileSummary {
   interests: string[];
   preferredCorrectionStyle: string;
   preferredWisePersonality: string;
+  /** 0.0–1.0 share of Wise's spoken output that should be Italian. */
+  languageRatio: number;
+  /** When true, Italian-only output is forced. */
+  immersionMode: boolean;
+}
+
+/**
+ * Sensible default Italian share by CEFR level. The user's explicit
+ * `languageRatio` always wins; this only fires for new profiles or as a
+ * sanity ceiling. Beginners get 10% per product spec — Italian only on
+ * already-covered material — and the share scales up to immersion at C1+.
+ */
+export function defaultLanguageRatio(level: string): number {
+  switch (level) {
+    case 'complete_beginner':
+      return 0.05;
+    case 'beginner':
+      return 0.1;
+    case 'lower_intermediate':
+      return 0.3;
+    case 'intermediate':
+      return 0.55;
+    case 'upper_intermediate':
+      return 0.8;
+    case 'advanced':
+      return 0.95;
+    default:
+      return 0.1;
+  }
 }
 
 export async function getWiseProfileSummary(userId: string): Promise<WiseProfileSummary | null> {
@@ -35,12 +64,19 @@ export async function getWiseProfileSummary(userId: string): Promise<WiseProfile
     include: { profile: true },
   });
   if (!user || !user.profile) return null;
+  // Stored ratio overrides the level default; defaultLanguageRatio is the
+  // floor when the stored value is suspiciously zero (cold-start profile).
+  const stored = Number(user.profile.languageRatio ?? 0);
+  const level = user.profile.currentLevel;
+  const languageRatio = stored > 0 ? stored : defaultLanguageRatio(level);
   return {
     name: user.name,
-    level: user.profile.currentLevel,
+    level,
     goals: user.profile.goals,
     interests: user.profile.interests,
     preferredCorrectionStyle: user.profile.preferredCorrectionStyle,
     preferredWisePersonality: user.profile.preferredWisePersonality,
+    languageRatio,
+    immersionMode: user.profile.immersionMode,
   };
 }

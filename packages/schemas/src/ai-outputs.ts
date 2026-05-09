@@ -203,7 +203,9 @@ export const WiseActionSchema = z.object({
   // the call site filter and decide whether to promote to GENERATE_LESSON
   // or drop the action.
   lessonId: z.string().nullable().optional(),
-  payload: z.record(z.unknown()).optional(),
+  // Same null-vs-undefined laxity for payload — many models emit
+  // `"payload": null` instead of omitting the key.
+  payload: z.record(z.unknown()).nullish(),
 });
 
 export const WiseTurnOutputSchema = z.object({

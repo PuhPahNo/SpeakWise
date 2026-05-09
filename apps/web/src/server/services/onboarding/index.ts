@@ -14,12 +14,16 @@ const ONBOARDING_FIELDS = [
   'preferredWisePersonality',
 ] as const;
 
+// Use .nullish() everywhere so the model can either omit a field OR
+// return null for "I didn't get that this turn" — both are equivalent.
+// Forcing .optional() (undefined-only) made every "preferredX: null"
+// reply 502 the whole onboarding turn.
 const OnboardingTurnSchema = z.object({
   wiseMessage: z.string().min(2).max(500),
   // Whatever the model extracted from this turn
   extracted: z.object({
-    goals: z.array(z.string().min(1).max(200)).max(8).optional(),
-    interests: z.array(z.string().min(1).max(80)).max(12).optional(),
+    goals: z.array(z.string().min(1).max(200)).max(8).nullish(),
+    interests: z.array(z.string().min(1).max(80)).max(12).nullish(),
     currentLevel: z
       .enum([
         'complete_beginner',
@@ -29,11 +33,11 @@ const OnboardingTurnSchema = z.object({
         'upper_intermediate',
         'advanced',
       ])
-      .optional(),
-    preferredSessionLengthMinutes: z.number().int().min(2).max(60).optional(),
+      .nullish(),
+    preferredSessionLengthMinutes: z.number().int().min(2).max(60).nullish(),
     preferredCorrectionStyle: z
       .enum(['gentle', 'direct', 'strict', 'end_of_task', 'major_mistakes_only', 'adaptive'])
-      .optional(),
+      .nullish(),
     preferredWisePersonality: z
       .enum([
         'default',
@@ -44,8 +48,10 @@ const OnboardingTurnSchema = z.object({
         'strict_grammar_coach',
         'casual_companion',
       ])
-      .optional(),
-    motivationNotes: z.string().max(2000).optional(),
+      .nullish(),
+    /** 0.0–1.0 share of Wise's spoken output that should be Italian. */
+    preferredLanguageRatio: z.number().min(0).max(1).nullish(),
+    motivationNotes: z.string().max(2000).nullish(),
   }),
   /** Whether the conversation should keep going. */
   done: z.boolean(),
@@ -116,11 +122,16 @@ export async function respondOnboarding(userId: string, sessionId: string, text:
   });
   const ai = result.data;
 
-  // Apply extracted profile updates (only what's present)
+  // Apply extracted profile updates (only what's present). The model
+  // emits `preferredLanguageRatio` but the column is `languageRatio`.
   const updates: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(ai.extracted)) {
     if (v === undefined || v === null) continue;
     if (Array.isArray(v) && v.length === 0) continue;
+    if (k === 'preferredLanguageRatio') {
+      updates.languageRatio = v;
+      continue;
+    }
     updates[k] = v;
   }
   if (Object.keys(updates).length > 0) {
