@@ -5,3 +5,4 @@ export * from './models';
 export * from './voices';
 export * from './call';
 export * from './errors';
+export * from './text-segmenter';

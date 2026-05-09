@@ -52,8 +52,12 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
   const briefing = (lesson.content as { briefing?: string } | null)?.briefing ?? '';
 
   const tutor = useVoiceTutor({
+    // STT 'it' so learner's Italian answers are transcribed correctly.
+    // TTS 'auto' so Wise's mixed English/Italian narration (briefings,
+    // task prompts that quote Italian, recap lines) lands with correct
+    // Italian phonetics on the Italian fragments.
     sttLanguage: 'it',
-    ttsLanguage: 'en', // wise speaks English; learner speaks Italian back
+    ttsLanguage: 'auto',
     onUserSpeech: async (text) => {
       setAnswer(text);
       // For voice tasks, auto-submit

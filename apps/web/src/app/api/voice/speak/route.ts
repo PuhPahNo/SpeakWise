@@ -6,7 +6,10 @@ import { z } from 'zod';
 
 const Schema = z.object({
   text: z.string().min(1).max(2000),
-  language: z.enum(['en', 'it']).default('it'),
+  // Default 'auto': segment the text and synthesize each phrase with the
+  // right language hint. Passing 'en' or 'it' forces the whole utterance
+  // to one language (used for things like a single Italian sample preview).
+  language: z.enum(['en', 'it', 'auto']).default('auto'),
   /** Optional override for one-off previews. Falls back to profile default. */
   voiceId: z.string().min(8).max(64).optional(),
 });

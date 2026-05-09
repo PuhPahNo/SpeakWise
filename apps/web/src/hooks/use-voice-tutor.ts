@@ -8,8 +8,14 @@ interface Options {
   onUserSpeech: (text: string) => void | Promise<void>;
   /** Language hint passed to Whisper for STT. */
   sttLanguage?: 'it' | 'en';
-  /** Language hint for TTS playback. */
-  ttsLanguage?: 'it' | 'en';
+  /**
+   * Language mode for TTS playback.
+   *  - 'auto' (default): server segments mixed text and pronounces Italian
+   *    phrases with Italian phonetics. The right answer 99% of the time.
+   *  - 'en' / 'it': force a single language. Used by lesson-level overrides
+   *    when we want pure-Italian roleplay or pure-English explanation.
+   */
+  ttsLanguage?: 'it' | 'en' | 'auto';
   /**
    * If true, after Wise finishes speaking we automatically begin listening
    * for the user's reply. This is the Jarvis turn-taking pattern.
@@ -321,7 +327,7 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
         const res = await fetch('/api/voice/speak', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, language: opts.ttsLanguage ?? 'en' }),
+          body: JSON.stringify({ text, language: opts.ttsLanguage ?? 'auto' }),
           signal: abort.signal,
         });
         // If a newer speak() came along, drop this one quietly.

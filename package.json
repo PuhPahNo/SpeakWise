@@ -25,6 +25,7 @@
     "db:seed": "pnpm --filter @speakwise/db seed",
     "smoke": "tsx scripts/smoke-test.ts",
     "qa:e2e": "node --experimental-strip-types --env-file=.env scripts/qa-end-to-end.ts",
+    "qa:audio": "node --experimental-strip-types --env-file=.env scripts/audio-multilingual-probe.ts",
     "user:create": "tsx scripts/create-user.ts",
     "clean": "turbo run clean && rm -rf node_modules .turbo"
   },

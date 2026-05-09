@@ -51,8 +51,10 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
   const greetedRef = useRef(false);
 
   const tutor = useVoiceTutor({
+    // 'auto': Italian phrases sprinkled into Wise's English get correct
+    // Italian phonetics. Same warm voice across both languages.
     sttLanguage: 'en',
-    ttsLanguage: 'en',
+    ttsLanguage: 'auto',
     autoListenAfterSpeak: true, // turn-taking
     onUserSpeech: async (text) => {
       setUserLine(text);

@@ -19,8 +19,12 @@ export default function OnboardingPage() {
   const beginningRef = useRef(false);
 
   const tutor = useVoiceTutor({
+    // Onboarding is a tutor-led English conversation with Italian greetings
+    // ("Ciao Anthony", "va bene"). 'auto' lets those phrases be pronounced
+    // with proper Italian phonetics while the rest stays warm English —
+    // same Wise voice across both languages.
     sttLanguage: 'en',
-    ttsLanguage: 'en',
+    ttsLanguage: 'auto',
     onUserSpeech: async (text) => {
       setUserLine(text);
       await sendResponse(text);
