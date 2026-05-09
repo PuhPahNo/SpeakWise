@@ -3,7 +3,7 @@
 import { useToast } from '@/components/ui/toast';
 import { VoiceOrb } from '@/components/voice/voice-orb';
 import { useVoiceTutor } from '@/hooks/use-voice-tutor';
-import { Flame, Sparkles } from 'lucide-react';
+import { Flame, Globe, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
@@ -49,6 +49,10 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
   const [userLine, setUserLine] = useState<string>('');
   const [pending, setPending] = useState(false);
   const greetedRef = useRef(false);
+  // Italian language settings — fetched once on mount so the toggle
+  // shows the current state immediately.
+  const [languageRatio, setLanguageRatio] = useState<number>(0.1);
+  const [immersionMode, setImmersionMode] = useState<boolean>(false);
 
   const tutor = useVoiceTutor({
     // Auto-detect on both ends: the learner might reply in either
@@ -73,15 +77,22 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
     greetedRef.current = true;
     (async () => {
       try {
-        const [greetRes, summaryRes, comebackRes] = await Promise.all([
+        const [greetRes, summaryRes, comebackRes, profileRes] = await Promise.all([
           fetch('/api/wise/greeting').then((r) => r.json() as Promise<GreetingResponse>),
           fetch('/api/gamification/summary').then((r) => r.json() as Promise<SummaryResponse>),
           fetch('/api/gamification/comeback').then((r) => r.json() as Promise<ComebackResponse>),
+          fetch('/api/profile').then(
+            (r) => r.json() as Promise<{ languageRatio?: number; immersionMode?: boolean }>,
+          ),
         ]);
         setGreeting(greetRes);
         setSummary(summaryRes);
         setComeback(comebackRes.offer);
         setWiseLine(greetRes.greeting);
+        if (profileRes.languageRatio != null)
+          setLanguageRatio(Number(profileRes.languageRatio));
+        if (profileRes.immersionMode != null)
+          setImmersionMode(Boolean(profileRes.immersionMode));
       } catch (e) {
         console.error('command-center boot failed', e);
       }
@@ -171,6 +182,41 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
     }
   }
 
+  // Toggle Italian-immersion. Persists to the profile so future Wise
+  // turns and lessons honor it. Optimistic local update for snappy feel.
+  async function toggleImmersion() {
+    const next = !immersionMode;
+    setImmersionMode(next);
+    try {
+      await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ immersionMode: next }),
+      });
+      toast.success(
+        next ? 'Modalità immersione attiva' : 'Immersion off',
+        next
+          ? 'Wise will speak only Italian until you toggle this back.'
+          : 'Wise is back to your usual language mix.',
+      );
+    } catch (e) {
+      // Roll back if the network blip fails the patch
+      setImmersionMode(!next);
+      console.error('immersion toggle failed', e);
+    }
+  }
+
+  // Map the stored ratio to a friendly label for the chip.
+  function ratioLabel(): string {
+    if (immersionMode) return 'Immersione';
+    const r = languageRatio;
+    if (r >= 0.85) return '~95% IT';
+    if (r >= 0.6) return '~70% IT';
+    if (r >= 0.35) return '~50% IT';
+    if (r >= 0.15) return '~25% IT';
+    return '~10% IT';
+  }
+
   async function startMission() {
     setPending(true);
     try {
@@ -256,6 +302,24 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
           )}
         </div>
       )}
+
+      {/* Italian-immersion chip — tap to flip the whole experience into
+          Italian-only mode (overrides languageRatio until tapped off). */}
+      <button
+        type="button"
+        onClick={toggleImmersion}
+        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs transition-all border ${
+          immersionMode
+            ? 'bg-wise-500/20 border-wise-500/60 text-wise-200'
+            : 'bg-white/3 border-white/10 text-ink-200 hover:border-wise-500/40'
+        }`}
+        aria-pressed={immersionMode}
+        title={immersionMode ? "Tap to leave full Italian immersion" : 'Tap for full Italian immersion'}
+      >
+        <Globe size={12} className={immersionMode ? 'text-wise-300' : 'text-ink-300'} aria-hidden />
+        <span>{ratioLabel()}</span>
+        {immersionMode && <span className="opacity-70">· tap to exit</span>}
+      </button>
 
       <h1 className="font-display text-2xl sm:text-3xl text-ink-50 leading-tight">
         Welcome back, {firstName}.

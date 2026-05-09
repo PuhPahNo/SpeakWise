@@ -19,6 +19,8 @@ export async function PATCH(req: Request) {
       preferredFrequency: body.preferredFrequency,
       motivationNotes: body.motivationNotes,
       wiseVoiceId: body.wiseVoiceId,
+      languageRatio: body.languageRatio,
+      immersionMode: body.immersionMode,
     });
   });
 }

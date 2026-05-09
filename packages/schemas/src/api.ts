@@ -47,6 +47,10 @@ export const PatchProfileRequestSchema = z.object({
   motivationNotes: z.string().max(2000).optional(),
   /** ElevenLabs voice ID — must be one of the curated WISE_VOICES. */
   wiseVoiceId: z.string().min(8).max(64).optional(),
+  /** 0.0–1.0 share of Wise's spoken output that should be Italian. */
+  languageRatio: z.number().min(0).max(1).optional(),
+  /** Hard "Italian-only" mode toggle — overrides languageRatio. */
+  immersionMode: z.boolean().optional(),
 });
 
 export const WiseMessageRequestSchema = z.object({

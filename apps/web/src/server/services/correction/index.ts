@@ -97,9 +97,29 @@ export async function evaluateUserResponse({
     },
   });
 
-  // Update progress for each tagged skill
+  // Update progress for each tagged skill. The dimension we move
+  // (production vs comprehension) depends on the task type:
+  //   - Active production: speaking_prompt, translation, roleplay,
+  //     scenario_roleplay — learner generated Italian.
+  //   - Passive comprehension: multiple_choice, fill_blank,
+  //     listening_comprehension, error_correction — learner recognized
+  //     Italian.
+  //   - 'both' for anything else (briefing/recap/explanation).
+  const taskType = ur.lessonTask?.taskType ?? '';
+  const dimension: 'production' | 'comprehension' | 'both' =
+    taskType === 'speaking_prompt' ||
+    taskType === 'translation' ||
+    taskType === 'roleplay' ||
+    taskType === 'conjugation'
+      ? 'production'
+      : taskType === 'multiple_choice' ||
+          taskType === 'fill_blank' ||
+          taskType === 'listening_comprehension' ||
+          taskType === 'error_correction'
+        ? 'comprehension'
+        : 'both';
   for (const skillId of ur.lessonTask?.targetSkillIds ?? []) {
-    await recordSkillEvidence({ userId, skillId, correct: ai.isCorrect });
+    await recordSkillEvidence({ userId, skillId, correct: ai.isCorrect, dimension });
   }
 
   await emitUserEvent(userId, 'UserCorrected', {

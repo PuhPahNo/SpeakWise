@@ -52,8 +52,8 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
   const briefing = (lesson.content as { briefing?: string } | null)?.briefing ?? '';
 
   // STT language is task-aware:
-  //   - speaking_prompt / translation / roleplay / scenario_roleplay /
-  //     listening_comprehension: learner is producing Italian → 'it'
+  //   - speaking_prompt / translation / roleplay / listening_comprehension:
+  //     learner is producing Italian → 'it'
   //   - multiple_choice / fill_blank: typed, no STT → doesn't matter
   //   - everything else / unknown: 'auto' so a casual English aside
   //     ("can you say that again?") still transcribes.
@@ -62,7 +62,6 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
     currentTaskTypeForStt === 'speaking_prompt' ||
     currentTaskTypeForStt === 'translation' ||
     currentTaskTypeForStt === 'roleplay' ||
-    currentTaskTypeForStt === 'scenario_roleplay' ||
     currentTaskTypeForStt === 'listening_comprehension'
       ? 'it'
       : 'auto';

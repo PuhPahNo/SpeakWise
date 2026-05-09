@@ -6,6 +6,16 @@ interface RecordResultOpts {
   skillId: string;
   correct: boolean;
   weight?: number;
+  /**
+   * Which dimension this evidence is moving:
+   *  - 'production'    learner generated Italian (speaking_prompt,
+   *                    translation, roleplay, scenario_roleplay).
+   *  - 'comprehension' learner recognized / understood Italian
+   *                    (multiple_choice, fill_blank, listening,
+   *                    error_correction picking the right one, etc.).
+   *  - 'both'          fallback when we can't tell — bumps both halves.
+   */
+  dimension?: 'production' | 'comprehension' | 'both';
 }
 
 const NEXT_REVIEW_DAYS_CORRECT = [1, 3, 7, 14, 30];
@@ -26,6 +36,7 @@ export async function recordSkillEvidence({
   skillId,
   correct,
   weight = 0.1,
+  dimension = 'both',
 }: RecordResultOpts) {
   const prev = await prisma.userSkillProgress.upsert({
     where: { userId_skillId: { userId, skillId } },
@@ -36,6 +47,18 @@ export async function recordSkillEvidence({
   const oldScore = Number(prev.masteryScore);
   const delta = correct ? weight : -weight * 0.7;
   const newScore = Math.max(0, Math.min(1, oldScore + delta));
+
+  // Per-dimension scores let Wise stretch the learner safely — speak a
+  // structure to them when comprehension is high but production is low,
+  // and only ask them to produce it once comprehension lands.
+  const oldComp = Number(prev.comprehensionScore);
+  const oldProd = Number(prev.productionScore);
+  const compDelta =
+    dimension === 'comprehension' || dimension === 'both' ? delta : delta * 0.3;
+  const prodDelta =
+    dimension === 'production' || dimension === 'both' ? delta : delta * 0.2;
+  const newComp = Math.max(0, Math.min(1, oldComp + compDelta));
+  const newProd = Math.max(0, Math.min(1, oldProd + prodDelta));
 
   const correctCount = prev.correctCount + (correct ? 1 : 0);
   const incorrectCount = prev.incorrectCount + (correct ? 0 : 1);
@@ -52,6 +75,8 @@ export async function recordSkillEvidence({
     data: {
       status: newStatus,
       masteryScore: newScore,
+      comprehensionScore: newComp,
+      productionScore: newProd,
       exposureCount: { increment: 1 },
       correctCount,
       incorrectCount,

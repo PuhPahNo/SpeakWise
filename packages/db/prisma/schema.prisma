@@ -311,6 +311,15 @@ model UserSkillProgress {
   skillId           String       @map("skill_id") @db.Uuid
   status            SkillStatus  @default(not_started)
   masteryScore      Decimal      @default(0) @map("mastery_score") @db.Decimal(4, 3)
+  /// 0..1 — how confidently the learner can RECOGNIZE / understand this
+  /// skill when Wise speaks it (passive). Bumped on listening_comprehension,
+  /// multiple_choice, and any task where the model emits Italian and the
+  /// learner picks/recognizes.
+  comprehensionScore Decimal     @default(0) @map("comprehension_score") @db.Decimal(4, 3)
+  /// 0..1 — how confidently the learner can PRODUCE this skill in
+  /// Italian (active). Bumped on speaking_prompt, translation, roleplay,
+  /// or any task where the learner generates Italian.
+  productionScore    Decimal     @default(0) @map("production_score") @db.Decimal(4, 3)
   exposureCount     Int          @default(0) @map("exposure_count")
   correctCount      Int          @default(0) @map("correct_count")
   incorrectCount    Int          @default(0) @map("incorrect_count")

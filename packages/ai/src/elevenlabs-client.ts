@@ -73,10 +73,10 @@ export async function synthesizeSpeech(input: SpeakInput): Promise<SpeakResult> 
     };
   }
 
-  // Multi-span path: synthesize each in PCM 22050 mono, concat, wrap as WAV.
-  // PCM avoids audible mp3 frame artifacts at boundaries; 22050 keeps audio
-  // crisp without bloating payloads. We then return WAV which every browser
-  // plays natively.
+  // Multi-span path: synthesize each in PCM 22050 mono, cross-fade
+  // adjacent spans, wrap as WAV. PCM avoids audible mp3 frame artifacts
+  // at boundaries; the cross-fade kills the tiny step-discontinuity at
+  // each splice that you'd otherwise hear as a faint click.
   const sampleRate = 22050;
   const pcmChunks: Buffer[] = [];
   for (const span of spans) {
@@ -88,7 +88,7 @@ export async function synthesizeSpeech(input: SpeakInput): Promise<SpeakResult> 
     });
     pcmChunks.push(Buffer.from(pcm));
   }
-  const pcmTotal = Buffer.concat(pcmChunks);
+  const pcmTotal = crossfadeMonoPcm16(pcmChunks, sampleRate, 30 /* ms */);
   const wav = wrapPcmAsWav(pcmTotal, sampleRate);
   // Copy into a fresh ArrayBuffer so the return type is unambiguous
   // (Node's Buffer can be backed by a SharedArrayBuffer in some envs).
@@ -161,6 +161,64 @@ async function ttsRaw(input: TtsRawInput): Promise<ArrayBuffer> {
     });
   }
   return res.arrayBuffer();
+}
+
+/**
+ * Cross-fade adjacent mono 16-bit-LE PCM chunks with a linear ramp of
+ * `fadeMs` milliseconds. The output length is shorter than the sum of
+ * inputs by `(N-1) * fadeMs` worth of samples — overlapping regions
+ * blend into one continuous stream so language switches sound fluid
+ * instead of stitched.
+ *
+ * If a chunk is shorter than the fade region, the fade clamps to that
+ * chunk's length to stay safe (no buffer overruns).
+ */
+function crossfadeMonoPcm16(chunks: Buffer[], sampleRate: number, fadeMs: number): Buffer {
+  if (chunks.length === 0) return Buffer.alloc(0);
+  if (chunks.length === 1) return chunks[0]!;
+
+  const fadeSamples = Math.max(1, Math.floor((fadeMs / 1000) * sampleRate));
+  // 16-bit mono → 2 bytes per sample
+  const out: Buffer[] = [];
+  let prev = chunks[0]!;
+  for (let i = 1; i < chunks.length; i++) {
+    const curr = chunks[i]!;
+    const safeFade = Math.min(
+      fadeSamples,
+      Math.floor(prev.length / 2),
+      Math.floor(curr.length / 2),
+    );
+    if (safeFade <= 1) {
+      // Either chunk is too tiny — just concatenate.
+      out.push(prev);
+      prev = curr;
+      continue;
+    }
+    // Emit prev's body up to (but not including) its fade-out region.
+    const prevBody = prev.subarray(0, prev.length - safeFade * 2);
+    out.push(prevBody);
+
+    // Mix prev's tail with curr's head sample-by-sample.
+    const blended = Buffer.alloc(safeFade * 2);
+    const prevTail = prev.subarray(prev.length - safeFade * 2);
+    const currHead = curr.subarray(0, safeFade * 2);
+    for (let s = 0; s < safeFade; s++) {
+      const t = s / (safeFade - 1); // 0..1
+      const a = prevTail.readInt16LE(s * 2);
+      const b = currHead.readInt16LE(s * 2);
+      // Equal-power-ish linear blend; clamp to int16 range.
+      let mixed = Math.round(a * (1 - t) + b * t);
+      if (mixed > 32767) mixed = 32767;
+      if (mixed < -32768) mixed = -32768;
+      blended.writeInt16LE(mixed, s * 2);
+    }
+    out.push(blended);
+
+    // Curr's tail (post-fade-in) becomes the new prev.
+    prev = curr.subarray(safeFade * 2);
+  }
+  out.push(prev);
+  return Buffer.concat(out);
 }
 
 /**

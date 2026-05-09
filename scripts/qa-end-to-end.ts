@@ -381,6 +381,18 @@ async function main() {
   if (progress.length === 0) fail('skill progress', 'no UserSkillProgress rows after lesson');
   else pass('skill progress rows', `${progress.length} skills tracked`);
 
+  // Production vs comprehension: at least ONE skill should have a
+  // non-zero score in either dimension after a lesson, otherwise the
+  // recordSkillEvidence dimension wiring is broken.
+  const anyProd = progress.some((p) => Number(p.productionScore) > 0);
+  const anyComp = progress.some((p) => Number(p.comprehensionScore) > 0);
+  if (anyProd || anyComp)
+    pass(
+      'production/comprehension scores tracked',
+      `prod=${progress.filter((p) => Number(p.productionScore) > 0).length}, comp=${progress.filter((p) => Number(p.comprehensionScore) > 0).length}`,
+    );
+  else fail('production/comprehension scores', 'all zero after a played lesson');
+
   const responses = await prisma.userResponse.findMany({
     where: { session: { userId: user.id } },
   });
