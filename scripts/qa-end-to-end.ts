@@ -12,50 +12,242 @@
 const IT_DIACRITICS = /[àèéìòùÀÈÉÌÒÙ]/;
 const IT_COMMON = new Set([
   // greetings + manners
-  'ciao', 'salve', 'arrivederci', 'buongiorno', 'buonasera', 'buonanotte',
-  'grazie', 'prego', 'scusa', 'scusi', 'piacere', 'pronto', 'certo',
-  'bentornato', 'bentornata', 'bentornati', 'bentornate',
+  'ciao',
+  'salve',
+  'arrivederci',
+  'buongiorno',
+  'buonasera',
+  'buonanotte',
+  'grazie',
+  'prego',
+  'scusa',
+  'scusi',
+  'piacere',
+  'pronto',
+  'certo',
+  'bentornato',
+  'bentornata',
+  'bentornati',
+  'bentornate',
   // articles, prepositions, contractions
-  'il', 'la', 'lo', 'gli', 'le', 'un', 'uno', 'una', 'di', 'da', 'in',
-  'su', 'per', 'con', 'al', 'allo', 'alla', 'ai', 'agli', 'alle', 'del',
-  'dello', 'della', 'dei', 'degli', 'delle', 'nel', 'nello', 'nella',
-  'nei', 'negli', 'nelle', 'sul', 'sullo', 'sulla', 'sui', 'sugli', 'sulle',
+  'il',
+  'la',
+  'lo',
+  'gli',
+  'le',
+  'un',
+  'uno',
+  'una',
+  'di',
+  'da',
+  'in',
+  'su',
+  'per',
+  'con',
+  'al',
+  'allo',
+  'alla',
+  'ai',
+  'agli',
+  'alle',
+  'del',
+  'dello',
+  'della',
+  'dei',
+  'degli',
+  'delle',
+  'nel',
+  'nello',
+  'nella',
+  'nei',
+  'negli',
+  'nelle',
+  'sul',
+  'sullo',
+  'sulla',
+  'sui',
+  'sugli',
+  'sulle',
   // pronouns
-  'io', 'tu', 'lui', 'lei', 'noi', 'voi', 'loro', 'mi', 'ti', 'ci', 'vi', 'si',
+  'io',
+  'tu',
+  'lui',
+  'lei',
+  'noi',
+  'voi',
+  'loro',
+  'mi',
+  'ti',
+  'ci',
+  'vi',
+  'si',
   // common verbs (essere/avere/fare/andare/volere/potere/dovere/dire)
-  'sono', 'sei', 'è', 'siamo', 'siete', 'ho', 'hai', 'ha', 'abbiamo',
-  'avete', 'hanno', 'faccio', 'fai', 'fa', 'facciamo', 'fate', 'fanno',
-  'vado', 'vai', 'va', 'andiamo', 'andate', 'vanno', 'voglio', 'vuoi',
-  'vuole', 'vogliamo', 'volete', 'vogliono', 'vorrei', 'vorresti',
-  'vorrebbe', 'posso', 'puoi', 'può', 'possiamo', 'potete', 'possono',
-  'devo', 'devi', 'deve', 'dobbiamo', 'dovete', 'devono', 'dico', 'dici',
-  'dice', 'diciamo', 'dite', 'dicono',
+  'sono',
+  'sei',
+  'è',
+  'siamo',
+  'siete',
+  'ho',
+  'hai',
+  'ha',
+  'abbiamo',
+  'avete',
+  'hanno',
+  'faccio',
+  'fai',
+  'fa',
+  'facciamo',
+  'fate',
+  'fanno',
+  'vado',
+  'vai',
+  'va',
+  'andiamo',
+  'andate',
+  'vanno',
+  'voglio',
+  'vuoi',
+  'vuole',
+  'vogliamo',
+  'volete',
+  'vogliono',
+  'vorrei',
+  'vorresti',
+  'vorrebbe',
+  'posso',
+  'puoi',
+  'può',
+  'possiamo',
+  'potete',
+  'possono',
+  'devo',
+  'devi',
+  'deve',
+  'dobbiamo',
+  'dovete',
+  'devono',
+  'dico',
+  'dici',
+  'dice',
+  'diciamo',
+  'dite',
+  'dicono',
   // adverbs / connectors
-  'sì', 'no', 'non', 'molto', 'tanto', 'poco', 'bene', 'male', 'oggi',
-  'ieri', 'domani', 'sempre', 'mai', 'già', 'ancora', 'anche', 'allora',
-  'però', 'perché', 'quindi', 'davvero', 'forse', 'magari',
-  'come', 'dove', 'quando', 'cosa', 'chi', 'quale', 'quali', 'quanto',
+  'sì',
+  'no',
+  'non',
+  'molto',
+  'tanto',
+  'poco',
+  'bene',
+  'male',
+  'oggi',
+  'ieri',
+  'domani',
+  'sempre',
+  'mai',
+  'già',
+  'ancora',
+  'anche',
+  'allora',
+  'però',
+  'perché',
+  'quindi',
+  'davvero',
+  'forse',
+  'magari',
+  'come',
+  'dove',
+  'quando',
+  'cosa',
+  'chi',
+  'quale',
+  'quali',
+  'quanto',
   // hallmark nouns/adjectives
-  'cibo', 'casa', 'giorno', 'tempo', 'volta', 'gente', 'ragazzo',
-  'ragazza', 'bambino', 'amico', 'amica', 'famiglia', 'lavoro', 'scuola',
-  'acqua', 'pasta', 'vino', 'caffè', 'cucina', 'ristorante', 'piatto',
-  'parola', 'parole', 'lingua', 'storia', 'musica', 'film', 'libro',
-  'viaggio', 'estate', 'settimana', 'mese', 'anno', 'mattina', 'sera',
-  'notte', 'cucinare', 'mangiare', 'bere', 'parlare', 'capire',
-  'imparare', 'lezione', 'lezioni', 'roleplay',
+  'cibo',
+  'casa',
+  'giorno',
+  'tempo',
+  'volta',
+  'gente',
+  'ragazzo',
+  'ragazza',
+  'bambino',
+  'amico',
+  'amica',
+  'famiglia',
+  'lavoro',
+  'scuola',
+  'acqua',
+  'pasta',
+  'vino',
+  'caffè',
+  'cucina',
+  'ristorante',
+  'piatto',
+  'parola',
+  'parole',
+  'lingua',
+  'storia',
+  'musica',
+  'film',
+  'libro',
+  'viaggio',
+  'estate',
+  'settimana',
+  'mese',
+  'anno',
+  'mattina',
+  'sera',
+  'notte',
+  'cucinare',
+  'mangiare',
+  'bere',
+  'parlare',
+  'capire',
+  'imparare',
+  'lezione',
+  'lezioni',
+  'roleplay',
   // set phrases (single-token slice)
-  'bene', 'piacere', 'ripasso', 'ripassare', 'esercizio', 'continuiamo',
-  'cominciamo', 'iniziamo', 'andiamo',
+  'bene',
+  'piacere',
+  'ripasso',
+  'ripassare',
+  'esercizio',
+  'continuiamo',
+  'cominciamo',
+  'iniziamo',
+  'andiamo',
 ]);
 const IT_ENDINGS = [
-  'are', 'ere', 'ire',           // infinitives
-  'ato', 'ata', 'ati', 'ate',    // participles -are
-  'uto', 'uta', 'uti', 'ute',    // participles -ere
-  'ito', 'ita', 'iti', 'ite',    // participles -ire
-  'ando', 'endo',                // gerunds
-  'iamo', 'avamo', 'evamo', 'ivamo', // -iamo conjugation endings
-  'azione', 'zione', 'mente',
-  'aggio', 'eggio',
+  'are',
+  'ere',
+  'ire', // infinitives
+  'ato',
+  'ata',
+  'ati',
+  'ate', // participles -are
+  'uto',
+  'uta',
+  'uti',
+  'ute', // participles -ere
+  'ito',
+  'ita',
+  'iti',
+  'ite', // participles -ire
+  'ando',
+  'endo', // gerunds
+  'iamo',
+  'avamo',
+  'evamo',
+  'ivamo', // -iamo conjugation endings
+  'azione',
+  'zione',
+  'mente',
+  'aggio',
+  'eggio',
 ];
 function countItalianRatio(text: string): { it: number; total: number; ratio: number } {
   const tokens = text.toLowerCase().match(/[a-zà-öø-ÿ']+/g) ?? [];
@@ -141,7 +333,7 @@ async function main() {
   const username = `qa-${randomBytes(4).toString('hex')}`;
   const password = 'qa-test-pw-1234';
 
-  log(`\n=== Speakwise end-to-end QA ===`);
+  log('\n=== Speakwise end-to-end QA ===');
   log(`base: ${BASE}`);
   log(`user: ${username}\n`);
 
@@ -203,10 +395,10 @@ async function main() {
   log(`    Wise: "${start.data.wiseMessage}"`);
 
   const userTurns = [
-    "I want to be conversational on a trip to Italy this summer.",
+    'I want to be conversational on a trip to Italy this summer.',
     "I'm into food, cooking, and music.",
     "I'm a beginner — I know maybe 20 words.",
-    "Probably 10 minutes a day. Be gentle when I mess up.",
+    'Probably 10 minutes a day. Be gentle when I mess up.',
     "I'd love a friendly tutor vibe.",
     'Just sprinkle a little Italian for now — mostly English while I get my feet wet.',
     "Yeah let's get going — that's everything.",
@@ -285,7 +477,7 @@ async function main() {
     redirect: 'manual',
   });
   if (pageRes.status === 404) {
-    fail('GET /lesson/{id} (browser path)', `404 — this is what the user sees`);
+    fail('GET /lesson/{id} (browser path)', '404 — this is what the user sees');
   } else if (pageRes.status >= 400) {
     fail('GET /lesson/{id} (browser path)', `status ${pageRes.status}`);
   } else {
@@ -309,7 +501,11 @@ async function main() {
       // Briefing should reference one of the user's interests (food/cooking/music) or goal (Italy/trip/summer)
       const referenced = /food|cook|music|italy|trip|summer/i.test(briefing);
       if (referenced) pass('briefing references learner context');
-      else fail('briefing', `generic — does not reference interests/goals: "${briefing.slice(0, 100)}…"`);
+      else
+        fail(
+          'briefing',
+          `generic — does not reference interests/goals: "${briefing.slice(0, 100)}…"`,
+        );
     }
     let badTasks = 0;
     for (const t of dbLesson.tasks) {
@@ -333,7 +529,7 @@ async function main() {
   if (sessionStart.status !== 200) {
     fail('lesson start', `status ${sessionStart.status}: ${sessionStart.raw.slice(0, 200)}`);
   } else {
-    pass('lesson session started', sessionStart.data.session.id.slice(0, 8) + '…');
+    pass('lesson session started', `${sessionStart.data.session.id.slice(0, 8)}…`);
     const sessionId = sessionStart.data.session.id;
 
     const tasks = dbLesson?.tasks ?? [];
@@ -341,9 +537,7 @@ async function main() {
     let correctCount = 0;
     for (const task of tasks) {
       const answer =
-        task.expectedAnswer ||
-        (task.options as string[] | null)?.[0] ||
-        'Sì, va bene.';
+        task.expectedAnswer || (task.options as string[] | null)?.[0] || 'Sì, va bene.';
       const r = await api<{
         correction: { isCorrect?: boolean };
         nextTask: unknown;
@@ -369,7 +563,10 @@ async function main() {
       { sessionId },
     );
     if (completeLesson.status !== 200) {
-      fail('lesson complete', `status ${completeLesson.status}: ${completeLesson.raw.slice(0, 200)}`);
+      fail(
+        'lesson complete',
+        `status ${completeLesson.status}: ${completeLesson.raw.slice(0, 200)}`,
+      );
     } else {
       pass('lesson completed');
     }
@@ -444,7 +641,10 @@ async function main() {
       /cibo|cucina|musica|italia|viaggio|estate|cucinare|bentornat/i.test(greeting.data.greeting);
     if (refsContext) pass('greeting references learner');
     else
-      fail('greeting personalization', `generic — no name/interest/goal in: "${greeting.data.greeting}"`);
+      fail(
+        'greeting personalization',
+        `generic — no name/interest/goal in: "${greeting.data.greeting}"`,
+      );
 
     // Verify Wise is honoring the language ratio. The QA user explicitly
     // requested "just sprinkle a little Italian — mostly English", so
@@ -542,8 +742,7 @@ async function main() {
               ? (optsAny[0] as string)
               : ((optsAny[0] as { value?: string }).value ?? null)
             : null;
-        const answer =
-          (task.expectedAnswer as string | null) || firstOptValue || 'Sì, va bene.';
+        const answer = (task.expectedAnswer as string | null) || firstOptValue || 'Sì, va bene.';
         const r = await api<unknown>('POST', '/api/practice/respond', cookie, {
           sessionId: sessionId2,
           lessonTaskId: task.id,
@@ -553,9 +752,14 @@ async function main() {
         if (r.status === 200) answered++;
       }
       pass('second lesson played', `${answered}/${dbLesson2.tasks.length} answered`);
-      const c2 = await api<unknown>('POST', `/api/lessons/${gen2.data.lesson.id}/complete`, cookie, {
-        sessionId: sessionId2,
-      });
+      const c2 = await api<unknown>(
+        'POST',
+        `/api/lessons/${gen2.data.lesson.id}/complete`,
+        cookie,
+        {
+          sessionId: sessionId2,
+        },
+      );
       if (c2.status === 200) pass('second lesson completed');
       else fail('second lesson complete', `status ${c2.status}: ${c2.raw.slice(0, 200)}`);
     }
@@ -579,7 +783,7 @@ async function main() {
     'I want to learn vocabulary today.',
     'Let me practice food words.',
     'Start a lesson please.',
-    "What should I work on?",
+    'What should I work on?',
   ];
   for (const message of probes) {
     const r = await api<{ wiseMessage: string; intent: string; actions: Array<{ type: string }> }>(
@@ -613,7 +817,7 @@ async function main() {
     data: {
       username: interUsername,
       passwordHash: await bcrypt.hash(password, 12),
-      name: `Inter QA`,
+      name: 'Inter QA',
       role: 'learner',
       nativeLanguage: 'en',
       targetLanguage: 'it',
@@ -664,19 +868,20 @@ async function main() {
       // For ratio 0.6 we want at least 30% Italian (lower bound; we don't
       // upper-bound because intermediates can absolutely handle more).
       if (r.ratio >= 0.3) pass('intermediate briefing is Italian-heavy');
-      else fail('intermediate briefing too English', `${(r.ratio * 100).toFixed(0)}% — should be ≥30%`);
+      else
+        fail(
+          'intermediate briefing too English',
+          `${(r.ratio * 100).toFixed(0)}% — should be ≥30%`,
+        );
     }
     // Also test that the greeting respects the higher ratio
-    const interGreet = await api<{ greeting: string }>(
-      'GET',
-      '/api/wise/greeting',
-      interCookie,
-    );
+    const interGreet = await api<{ greeting: string }>('GET', '/api/wise/greeting', interCookie);
     const gr = countItalianRatio(interGreet.data.greeting);
     log(`    intermediate greeting: "${interGreet.data.greeting}"`);
     log(`    italian-ratio measured: ${(gr.ratio * 100).toFixed(0)}%`);
     if (gr.ratio >= 0.3) pass('intermediate greeting is Italian-heavy');
-    else fail('intermediate greeting too English', `${(gr.ratio * 100).toFixed(0)}% — should be ≥30%`);
+    else
+      fail('intermediate greeting too English', `${(gr.ratio * 100).toFixed(0)}% — should be ≥30%`);
   }
 
   await cleanup(prisma, interUser.id);

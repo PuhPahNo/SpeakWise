@@ -80,8 +80,7 @@ export async function generateLesson(input: GenerateLessonInput) {
     // Prefer the explicit duration; otherwise warm-up beginners with shorter
     // lessons. The previous form had a precedence bug — the ?? was binding
     // before the comparison and forcing a boolean → 8.
-    durationMinutes:
-      input.durationMinutes ?? (profile.level === 'complete_beginner' ? 8 : 12),
+    durationMinutes: input.durationMinutes ?? (profile.level === 'complete_beginner' ? 8 : 12),
     interestTheme: input.interestTheme ?? null,
     userRequest: input.userRequest ?? null,
   };

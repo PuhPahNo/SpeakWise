@@ -82,7 +82,7 @@ describe('crossfade (mono PCM-16)', () => {
     const out = crossfade([a, b], SR, FADE_MS);
     // The crossfade region should ramp from 100 → 200 monotonically.
     const fadeStart = (out.length - fadeSamples * 2 - (b.length - fadeSamples * 2)) / 2;
-    let lastVal = -Infinity;
+    let lastVal = Number.NEGATIVE_INFINITY;
     let nonDecreasing = true;
     for (let i = 0; i < fadeSamples; i++) {
       const v = out.readInt16LE((fadeStart + i) * 2);

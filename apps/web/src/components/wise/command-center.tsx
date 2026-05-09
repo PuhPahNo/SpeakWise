@@ -89,10 +89,8 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
         setSummary(summaryRes);
         setComeback(comebackRes.offer);
         setWiseLine(greetRes.greeting);
-        if (profileRes.languageRatio != null)
-          setLanguageRatio(Number(profileRes.languageRatio));
-        if (profileRes.immersionMode != null)
-          setImmersionMode(Boolean(profileRes.immersionMode));
+        if (profileRes.languageRatio != null) setLanguageRatio(Number(profileRes.languageRatio));
+        if (profileRes.immersionMode != null) setImmersionMode(Boolean(profileRes.immersionMode));
       } catch (e) {
         console.error('command-center boot failed', e);
       }
@@ -147,9 +145,7 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
       const isUuid = (v: unknown): v is string =>
         typeof v === 'string' &&
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
-      const startAction = data.actions.find(
-        (a) => a.type === 'START_LESSON' && isUuid(a.lessonId),
-      );
+      const startAction = data.actions.find((a) => a.type === 'START_LESSON' && isUuid(a.lessonId));
       if (startAction?.lessonId) {
         await tutor.speak(data.wiseMessage, { autoListenAfter: false });
         router.push(`/lesson/${startAction.lessonId}`);
@@ -314,7 +310,9 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
             : 'bg-white/3 border-white/10 text-ink-200 hover:border-wise-500/40'
         }`}
         aria-pressed={immersionMode}
-        title={immersionMode ? "Tap to leave full Italian immersion" : 'Tap for full Italian immersion'}
+        title={
+          immersionMode ? 'Tap to leave full Italian immersion' : 'Tap for full Italian immersion'
+        }
       >
         <Globe size={12} className={immersionMode ? 'text-wise-300' : 'text-ink-300'} aria-hidden />
         <span>{ratioLabel()}</span>

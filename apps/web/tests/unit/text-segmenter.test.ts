@@ -31,7 +31,7 @@ describe('segmentMixedText', () => {
   });
 
   it('returns a single Italian span for pure Italian', () => {
-    const r = segmentMixedText("Ciao Anthony. Come va? Vorrei un caffè.");
+    const r = segmentMixedText('Ciao Anthony. Come va? Vorrei un caffè.');
     expect(r).toHaveLength(1);
     expect(r[0]?.lang).toBe('it');
   });

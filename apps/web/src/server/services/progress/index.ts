@@ -53,10 +53,8 @@ export async function recordSkillEvidence({
   // and only ask them to produce it once comprehension lands.
   const oldComp = Number(prev.comprehensionScore);
   const oldProd = Number(prev.productionScore);
-  const compDelta =
-    dimension === 'comprehension' || dimension === 'both' ? delta : delta * 0.3;
-  const prodDelta =
-    dimension === 'production' || dimension === 'both' ? delta : delta * 0.2;
+  const compDelta = dimension === 'comprehension' || dimension === 'both' ? delta : delta * 0.3;
+  const prodDelta = dimension === 'production' || dimension === 'both' ? delta : delta * 0.2;
   const newComp = Math.max(0, Math.min(1, oldComp + compDelta));
   const newProd = Math.max(0, Math.min(1, oldProd + prodDelta));
 

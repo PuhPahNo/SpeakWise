@@ -50,9 +50,7 @@ export async function synthesizeSpeech(input: SpeakInput): Promise<SpeakResult> 
 
   // Build spans. Single-language mode is just a one-element span list.
   const spans: Span[] =
-    lang === 'auto'
-      ? segmentMixedText(input.text)
-      : [{ lang, text: input.text }];
+    lang === 'auto' ? segmentMixedText(input.text) : [{ lang, text: input.text }];
 
   // Fast path: single span with single language → one mp3, no stitching.
   if (spans.length === 1 && spans[0]) {

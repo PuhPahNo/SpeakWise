@@ -275,9 +275,9 @@ const TOKEN_RE = /[A-Za-zÀ-ÖØ-öø-ÿ']+/g;
 
 function tokenize(text: string): string[] {
   const out: string[] = [];
-  let m: RegExpExecArray | null;
-  TOKEN_RE.lastIndex = 0;
-  while ((m = TOKEN_RE.exec(text)) !== null) out.push(m[0].toLowerCase());
+  for (const match of text.matchAll(TOKEN_RE)) {
+    out.push(match[0].toLowerCase());
+  }
   return out;
 }
 
@@ -323,9 +323,8 @@ function splitPhrases(text: string): string[] {
   // mixed clauses awkwardly.
   const parts: string[] = [];
   const re = /([^.!?;:—–]+[.!?;:—–]?)/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
-    const chunk = (m[1] ?? '').trim();
+  for (const match of text.matchAll(re)) {
+    const chunk = (match[1] ?? '').trim();
     if (chunk) parts.push(chunk);
   }
   return parts.length > 0 ? parts : [text];
@@ -339,10 +338,7 @@ function splitPhrases(text: string): string[] {
  * conservative on calling something Italian, since misclassifying English
  * as Italian sounds worse than the reverse.
  */
-export function segmentMixedText(
-  text: string,
-  opts: { italianThreshold?: number } = {},
-): Span[] {
+export function segmentMixedText(text: string, opts: { italianThreshold?: number } = {}): Span[] {
   const threshold = opts.italianThreshold ?? 0.3;
   const phrases = splitPhrases(text);
   const tagged: Span[] = phrases.map((p) => ({

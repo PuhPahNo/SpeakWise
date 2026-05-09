@@ -63,7 +63,7 @@ async function main() {
   // Transcribe back via auto-detect (no language param). Verifies that
   // /api/voice/transcribe correctly omits the language hint when not
   // forced and that Whisper can pick out a mixed phrase.
-  console.log(`probe: transcribing back via auto-detect…`);
+  console.log('probe: transcribing back via auto-detect…');
   const fd = new FormData();
   const blob = new Blob([audio], { type: ctype });
   fd.append('audio', blob, `probe.${ext}`);
@@ -84,7 +84,7 @@ async function main() {
   // Also probe a forced-Italian-only path: send the same audio with
   // language='it' and verify it still transcribes (used by lesson-player
   // for Italian-only roleplay tasks).
-  console.log(`probe: transcribing back with language=it forced…`);
+  console.log('probe: transcribing back with language=it forced…');
   const fd2 = new FormData();
   fd2.append('audio', new Blob([audio], { type: ctype }), `probe.${ext}`);
   fd2.append('language', 'it');
@@ -106,7 +106,7 @@ async function main() {
   const englishHit = /welcome|practice|let'?s|ordering/.test(transcript);
 
   console.log('');
-  console.log(`assertions:`);
+  console.log('assertions:');
   console.log(`  italian content present: ${italianHit ? '✓' : '✗'}`);
   console.log(`  english content present: ${englishHit ? '✓' : '✗'}`);
   console.log(`  forced-it transcribe ok:  ${stt2.text.length > 5 ? '✓' : '✗'}`);

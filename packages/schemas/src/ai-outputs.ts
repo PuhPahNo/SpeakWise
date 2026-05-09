@@ -92,9 +92,7 @@ export const LessonGenerationOutputSchema = z.object({
         // The model often returns options as plain strings instead of
         // {value,label} pairs, so accept both shapes and normalize at
         // call sites. Same with expectedAnswer — accept anything.
-        options: z
-          .union([z.array(MultipleChoiceOptionSchema), z.array(z.string())])
-          .optional(),
+        options: z.union([z.array(MultipleChoiceOptionSchema), z.array(z.string())]).optional(),
         expectedAnswer: z.unknown().optional(),
         explanation: z.string().optional(),
         skillTags: z.array(z.string()).default([]),
