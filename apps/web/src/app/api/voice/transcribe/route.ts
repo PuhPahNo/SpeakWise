@@ -10,7 +10,14 @@ export async function POST(req: Request) {
     await getOrCreateUser();
     const form = await req.formData();
     const file = form.get('audio');
-    const language = (form.get('language') as 'en' | 'it' | null) ?? 'it';
+    // Language hint:
+    //   - 'en' / 'it' force a specific language (caller already knows what
+    //     they expect, e.g. forced-Italian roleplay tasks).
+    //   - 'auto' or null tells Whisper to auto-detect — used in mixed
+    //     contexts where the learner might reply in either language.
+    const langRaw = form.get('language');
+    const language: 'en' | 'it' | undefined =
+      langRaw === 'en' || langRaw === 'it' ? langRaw : undefined;
     if (!(file instanceof Blob)) {
       return NextResponse.json({ error: 'audio file required' }, { status: 400 });
     }

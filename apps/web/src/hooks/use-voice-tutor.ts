@@ -6,8 +6,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 interface Options {
   /** Called with the user's transcribed speech once they finish recording. */
   onUserSpeech: (text: string) => void | Promise<void>;
-  /** Language hint passed to Whisper for STT. */
-  sttLanguage?: 'it' | 'en';
+  /**
+   * Language hint passed to Whisper for STT.
+   *  - 'auto' (default): Whisper auto-detects — right answer for general
+   *    use, since the learner might reply in either English or Italian
+   *    on the same screen.
+   *  - 'en' / 'it': force one language. Useful for forced-Italian
+   *    roleplay tasks where we know the learner is producing Italian.
+   */
+  sttLanguage?: 'it' | 'en' | 'auto';
   /**
    * Language mode for TTS playback.
    *  - 'auto' (default): server segments mixed text and pronounces Italian
@@ -254,12 +261,16 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
     const blob = new Blob(stoppedChunks, { type: stoppedChunks[0]?.type ?? 'audio/webm' });
     const fd = new FormData();
     fd.append('audio', blob, 'speech.webm');
-    fd.append('language', opts.sttLanguage ?? 'it');
+    // 'auto' / undefined → omit the field so Whisper auto-detects. Real
+    // user replies might be English ("yeah, let's start") or Italian
+    // ("vorrei una pasta") on the same screen; forcing one was wrong.
+    const lang = opts.sttLanguage ?? 'auto';
+    if (lang === 'en' || lang === 'it') fd.append('language', lang);
 
     try {
       const res = await fetch('/api/voice/transcribe', { method: 'POST', body: fd });
       if (!res.ok) throw new Error(`transcribe failed: ${res.status}`);
-      const data = (await res.json()) as { text?: string };
+      const data = (await res.json()) as { text?: string; language?: string };
       const text = (data.text ?? '').trim();
       if (text) {
         setState('thinking');

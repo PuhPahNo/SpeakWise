@@ -51,9 +51,11 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
   const greetedRef = useRef(false);
 
   const tutor = useVoiceTutor({
-    // 'auto': Italian phrases sprinkled into Wise's English get correct
-    // Italian phonetics. Same warm voice across both languages.
-    sttLanguage: 'en',
+    // Auto-detect on both ends: the learner might reply in either
+    // language on this screen, and Wise's reply mixes naturally. Italian
+    // phrases get correct phonetics; English stays warm English; same
+    // voice across both.
+    sttLanguage: 'auto',
     ttsLanguage: 'auto',
     autoListenAfterSpeak: true, // turn-taking
     onUserSpeech: async (text) => {

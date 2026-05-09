@@ -60,14 +60,14 @@ async function main() {
   console.log(`  bytes: ${audio.byteLength}, content-type: ${ctype}`);
   console.log(`  wrote: ${path}`);
 
-  // Transcribe back. /api/voice/transcribe accepts a multipart upload of
-  // the audio blob and returns a Whisper transcript.
-  console.log(`probe: transcribing the synthesized audio back…`);
+  // Transcribe back via auto-detect (no language param). Verifies that
+  // /api/voice/transcribe correctly omits the language hint when not
+  // forced and that Whisper can pick out a mixed phrase.
+  console.log(`probe: transcribing back via auto-detect…`);
   const fd = new FormData();
   const blob = new Blob([audio], { type: ctype });
   fd.append('audio', blob, `probe.${ext}`);
-  // Don't pass language — let Whisper auto-detect, so we can see what
-  // language(s) it actually picks up.
+  // Intentionally NOT setting `language` so the route omits the hint.
   const sttRes = await fetch(`${BASE}/api/voice/transcribe`, {
     method: 'POST',
     headers: { Cookie: cookie },
@@ -81,6 +81,22 @@ async function main() {
   console.log(`  detected language: ${stt.language ?? '(unset)'}`);
   console.log(`  transcript: "${stt.text}"`);
 
+  // Also probe a forced-Italian-only path: send the same audio with
+  // language='it' and verify it still transcribes (used by lesson-player
+  // for Italian-only roleplay tasks).
+  console.log(`probe: transcribing back with language=it forced…`);
+  const fd2 = new FormData();
+  fd2.append('audio', new Blob([audio], { type: ctype }), `probe.${ext}`);
+  fd2.append('language', 'it');
+  const sttRes2 = await fetch(`${BASE}/api/voice/transcribe`, {
+    method: 'POST',
+    headers: { Cookie: cookie },
+    body: fd2,
+  });
+  const stt2 = (await sttRes2.json()) as { text: string; language?: string };
+  console.log(`  forced-IT detected: ${stt2.language ?? '(unset)'}`);
+  console.log(`  forced-IT transcript: "${stt2.text}"`);
+
   const transcript = stt.text.toLowerCase();
   const italianHit =
     /ciao/.test(transcript) ||
@@ -93,7 +109,8 @@ async function main() {
   console.log(`assertions:`);
   console.log(`  italian content present: ${italianHit ? '✓' : '✗'}`);
   console.log(`  english content present: ${englishHit ? '✓' : '✗'}`);
-  process.exit(italianHit && englishHit ? 0 : 1);
+  console.log(`  forced-it transcribe ok:  ${stt2.text.length > 5 ? '✓' : '✗'}`);
+  process.exit(italianHit && englishHit && stt2.text.length > 5 ? 0 : 1);
 }
 
 main().catch((e) => {
