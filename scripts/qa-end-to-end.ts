@@ -461,6 +461,42 @@ async function main() {
         'language-ratio overshoot',
         `${(rstats.ratio * 100).toFixed(0)}% Italian for a "sprinkle" learner — should be ≤ 35%`,
       );
+
+    // ── Audio sanity-check: synthesize the actual Wise greeting through
+    // /api/voice/speak with language='auto', send the audio back through
+    // /api/voice/transcribe (auto-detect), and assert that what comes
+    // out is recognizably the same bilingual content. This catches
+    // regressions where the multilingual TTS pipeline silently breaks
+    // (single-language fallback, mp3 frame artifacts, etc.).
+    const ttsRes = await fetch(`${BASE}/api/voice/speak`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ text: greeting.data.greeting, language: 'auto' }),
+    });
+    if (!ttsRes.ok) {
+      fail('greeting TTS', `status ${ttsRes.status}`);
+    } else {
+      const audioBuf = await ttsRes.arrayBuffer();
+      const audioCtype = ttsRes.headers.get('content-type') ?? 'audio/mpeg';
+      const audioExt = audioCtype.includes('wav') ? 'wav' : 'mp3';
+      const tFd = new FormData();
+      tFd.append('audio', new Blob([audioBuf], { type: audioCtype }), `g.${audioExt}`);
+      const sttBack = await fetch(`${BASE}/api/voice/transcribe`, {
+        method: 'POST',
+        headers: { Cookie: cookie },
+        body: tFd,
+      });
+      const sttData = (await sttBack.json()) as { text?: string; language?: string };
+      const back = (sttData.text ?? '').toLowerCase();
+      log(`    audio round-trip transcript: "${sttData.text}"`);
+      // The greeting always opens with "Ciao" — that single word is
+      // the must-survive marker for "we actually got Italian phonetics".
+      if (/ciao|bentornat/.test(back)) pass('audio round-trip preserved Italian');
+      else fail('audio round-trip', `Italian opener missing in: "${back.slice(0, 100)}"`);
+      // Round-trip should not be empty / catastrophically short.
+      if (back.length >= 10) pass('audio round-trip readable');
+      else fail('audio round-trip', `transcript too short (${back.length} chars)`);
+    }
   }
 
   // ── 9b. Second lesson — verify cross-session continuity ──────────
