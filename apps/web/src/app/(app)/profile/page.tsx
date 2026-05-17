@@ -1,3 +1,4 @@
+import { InteractionModeCard } from '@/components/profile/interaction-mode-card';
 import { LanguageBalanceCard } from '@/components/profile/language-balance-card';
 import { ProfileEditor } from '@/components/profile/profile-editor';
 import { TutorCard } from '@/components/profile/tutor-card';
@@ -24,6 +25,13 @@ export default async function ProfilePage() {
           What Wise remembers, and what you&apos;d like to change.
         </p>
       </div>
+
+      {/* How Wise communicates — voice-first vs text-first default. */}
+      <section>
+        <InteractionModeCard
+          initial={profile.preferredInteractionMode === 'text' ? 'text' : 'voice'}
+        />
+      </section>
 
       {/* Language preferences — used to live as a chip on the home page,
           now properly settable here with auto-vs-override clarity. */}

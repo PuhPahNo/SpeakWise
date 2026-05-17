@@ -1,12 +1,16 @@
 import { LessonPlayer } from '@/components/lesson/lesson-player';
 import { getOrCreateUser } from '@/lib/auth/current-user';
 import { getLesson } from '@/server/services/lesson';
+import { ensureProfile } from '@/server/services/profile';
 import { notFound } from 'next/navigation';
 
 export default async function LessonPage({ params }: { params: Promise<{ lessonId: string }> }) {
   const { lessonId } = await params;
   const user = await getOrCreateUser();
-  const lesson = await getLesson(user.id, lessonId);
+  const [lesson, profile] = await Promise.all([
+    getLesson(user.id, lessonId),
+    ensureProfile(user.id),
+  ]);
   if (!lesson) notFound();
 
   return (
@@ -19,7 +23,11 @@ export default async function LessonPage({ params }: { params: Promise<{ lessonI
           {lesson.title}
         </h1>
       </div>
-      <LessonPlayer lesson={lesson} tasks={lesson.tasks} />
+      <LessonPlayer
+        lesson={lesson}
+        tasks={lesson.tasks}
+        defaultMode={profile.preferredInteractionMode === 'text' ? 'text' : 'voice'}
+      />
     </div>
   );
 }

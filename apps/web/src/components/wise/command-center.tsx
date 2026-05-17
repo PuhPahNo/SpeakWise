@@ -3,13 +3,15 @@
 import { useToast } from '@/components/ui/toast';
 import { VoiceOrb } from '@/components/voice/voice-orb';
 import { useVoiceTutor } from '@/hooks/use-voice-tutor';
-import { Flame, Sparkles } from 'lucide-react';
+import { Flame, MessageSquareText, Mic, Send, Sparkles, Volume2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 interface Props {
   firstName: string;
   sessionMinutes: number;
+  /** From LearnerProfile.preferredInteractionMode; user can flip per-session. */
+  defaultMode?: 'voice' | 'text';
 }
 
 interface WiseTurn {
@@ -39,7 +41,7 @@ interface ComebackResponse {
   offer: { daysMissed: number; recommendedDurationMinutes: number; reason: string } | null;
 }
 
-export function CommandCenter({ firstName, sessionMinutes }: Props) {
+export function CommandCenter({ firstName, sessionMinutes, defaultMode = 'voice' }: Props) {
   const router = useRouter();
   const toast = useToast();
   const [greeting, setGreeting] = useState<GreetingResponse | null>(null);
@@ -55,6 +57,12 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
   // on this voice-first home page.
   const [languageRatio, setLanguageRatio] = useState<number>(0.1);
   const [immersionMode, setImmersionMode] = useState<boolean>(false);
+  // Per-session interaction mode. Initialized from the profile default
+  // passed by the server but tweakable inline so users can flip into a
+  // voice conversation without changing their profile preference.
+  const [mode, setMode] = useState<'voice' | 'text'>(defaultMode);
+  // Text-mode draft input. Used when mode === 'text'.
+  const [textInput, setTextInput] = useState('');
 
   const tutor = useVoiceTutor({
     // Auto-detect on both ends: the learner might reply in either
@@ -64,6 +72,12 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
     sttLanguage: 'auto',
     ttsLanguage: 'auto',
     autoListenAfterSpeak: true, // turn-taking
+    // The hook respects `mode === 'text'` by no-op'ing speak() so
+    // chat-style users never hear unexpected narration. Calls to
+    // tutor.speak() from below still work in voice mode; in text mode
+    // they short-circuit cleanly. Explicit "Listen" buttons use
+    // tutor.playOnce() to bypass the gate.
+    mode,
     onUserSpeech: async (text) => {
       setUserLine(text);
       await sendToWise(text);
@@ -303,26 +317,67 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
       )}
 
       {/* Language-immersion + tutor controls moved off the home page —
-          they live on /profile now. The home is voice-first. */}
+          they live on /profile now. */}
 
       <h1 className="font-display text-2xl sm:text-3xl text-ink-50 leading-tight">
         Welcome back, {firstName}.
       </h1>
 
+      {/* Per-session mode toggle. Initial value comes from the profile;
+          flipping here doesn't change the saved default. */}
+      <button
+        type="button"
+        onClick={() => setMode(mode === 'voice' ? 'text' : 'voice')}
+        className="inline-flex items-center gap-1.5 rounded-full surface px-3 py-1 text-xs text-ink-200 hover:text-ink-50 hover:border-wise-500/40 transition"
+        title={
+          mode === 'voice'
+            ? 'Switch to text — type your replies instead'
+            : 'Switch to voice — tap the orb and speak'
+        }
+      >
+        {mode === 'voice' ? (
+          <>
+            <Mic size={12} className="text-wise-300" aria-hidden />
+            <span>Voice mode</span>
+            <span className="opacity-60">· tap to type</span>
+          </>
+        ) : (
+          <>
+            <MessageSquareText size={12} className="text-wise-300" aria-hidden />
+            <span>Text mode</span>
+            <span className="opacity-60">· tap to talk</span>
+          </>
+        )}
+      </button>
+
+      {/* Orb is always present — even text-mode users can tap to talk —
+          but in text mode it shrinks to make the chat the focus. */}
       <VoiceOrb
-        // Show thinking state during pending background work so the user
-        // sees movement immediately on tap, not a static orb.
         state={pending ? 'thinking' : tutor.state}
-        size="lg"
+        size={mode === 'text' ? 'sm' : 'lg'}
         amplitude={tutor.amplitude}
         onTap={onOrbTap}
       />
 
       <div className="text-center min-h-[5rem] max-w-xl">
         {wiseLine ? (
-          <p className="font-display text-xl sm:text-2xl text-ink-50 animate-fade-up leading-snug">
-            {wiseLine}
-          </p>
+          <div className="space-y-2">
+            <p className="font-display text-xl sm:text-2xl text-ink-50 animate-fade-up leading-snug">
+              {wiseLine}
+            </p>
+            {/* In text mode, give the learner an explicit way to hear
+                Wise's last line — bypasses the speak() no-op gate. */}
+            {mode === 'text' && (
+              <button
+                type="button"
+                onClick={() => void tutor.playOnce(wiseLine)}
+                className="inline-flex items-center gap-1.5 text-xs text-ink-300 hover:text-ink-50 transition"
+                aria-label="Listen to this"
+              >
+                <Volume2 size={12} aria-hidden /> Listen
+              </button>
+            )}
+          </div>
         ) : (
           <p className="text-ink-200 text-sm">Loading…</p>
         )}
@@ -333,7 +388,42 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
         )}
       </div>
 
-      <p className="text-xs text-ink-200 -mt-2">{statusText()}</p>
+      {/* In text mode, the type-to-Wise input sits where voice users see
+          the status text. In voice mode it's hidden and the orb is the
+          primary control. */}
+      {mode === 'text' ? (
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const t = textInput.trim();
+            if (!t || pending) return;
+            setUserLine(t);
+            setTextInput('');
+            await sendToWise(t);
+          }}
+          className="w-full max-w-xl flex gap-2 -mt-2"
+        >
+          <input
+            value={textInput}
+            onChange={(e) => setTextInput(e.target.value)}
+            placeholder="Type to Wise…"
+            disabled={pending}
+            enterKeyHint="send"
+            autoCapitalize="sentences"
+            className="flex-1 min-w-0"
+          />
+          <button
+            type="submit"
+            disabled={!textInput.trim() || pending}
+            className="rounded-full bg-wise-500 hover:bg-wise-600 disabled:opacity-50 text-ink-900 font-medium px-4 inline-flex items-center justify-center"
+            aria-label="Send"
+          >
+            <Send size={16} />
+          </button>
+        </form>
+      ) : (
+        <p className="text-xs text-ink-200 -mt-2">{statusText()}</p>
+      )}
 
       {comeback && (
         <button

@@ -41,4 +41,5 @@ export {
   RightsStatus,
   TutorStudentStatus,
   DirectiveStatus,
+  InteractionMode,
 } from '@prisma/client';

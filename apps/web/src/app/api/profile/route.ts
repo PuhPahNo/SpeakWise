@@ -22,6 +22,7 @@ export async function PATCH(req: Request) {
       languageRatio: body.languageRatio,
       languageRatioOverridden: body.languageRatioOverridden,
       immersionMode: body.immersionMode,
+      preferredInteractionMode: body.preferredInteractionMode,
     });
   });
 }

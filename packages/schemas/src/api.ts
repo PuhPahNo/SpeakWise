@@ -58,6 +58,12 @@ export const PatchProfileRequestSchema = z.object({
   languageRatioOverridden: z.boolean().optional(),
   /** Hard "Italian-only" mode toggle — overrides languageRatio. */
   immersionMode: z.boolean().optional(),
+  /**
+   * Default UI mode for Wise interactions:
+   *   voice — Wise auto-speaks; learner answers by voice (orb-first).
+   *   text  — Wise renders text immediately; learner types.
+   */
+  preferredInteractionMode: z.enum(['voice', 'text']).optional(),
 });
 
 // ── Classroom / tutor APIs ────────────────────────────────────────────

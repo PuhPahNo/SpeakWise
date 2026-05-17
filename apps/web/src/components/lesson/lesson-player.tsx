@@ -3,7 +3,7 @@
 import { VoiceOrb } from '@/components/voice/voice-orb';
 import { useVoiceTutor } from '@/hooks/use-voice-tutor';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
+import { MessageSquareText, Mic, Sparkles, Volume2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
@@ -75,7 +75,16 @@ interface CorrectionData {
 
 type Phase = 'idle' | 'briefing' | 'task' | 'correction' | 'complete';
 
-export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] }) {
+export function LessonPlayer({
+  lesson,
+  tasks,
+  defaultMode = 'voice',
+}: {
+  lesson: Lesson;
+  tasks: Task[];
+  /** Profile-determined default; users can flip per-lesson via the chip. */
+  defaultMode?: 'voice' | 'text';
+}) {
   const router = useRouter();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
@@ -87,6 +96,11 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
   const [xpEarned, setXpEarned] = useState<number | null>(null);
   const [streakDays, setStreakDays] = useState<number | null>(null);
   const [newMemory, setNewMemory] = useState<Array<{ type: string; content: string }>>([]);
+  // Per-session interaction mode for the lesson. Initialized from the
+  // profile default; flippable inline via the chip in the header so a
+  // text-mode user can opt into voice for one lesson without changing
+  // their profile (and vice versa).
+  const [mode, setMode] = useState<'voice' | 'text'>(defaultMode);
   const briefedRef = useRef(false);
 
   const briefing = (lesson.content as { briefing?: string } | null)?.briefing ?? '';
@@ -113,6 +127,11 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
     // — see currentTaskTypeForStt above.
     sttLanguage: sttLang,
     ttsLanguage: 'auto',
+    // Mode gates auto-narration. In text mode the auto-speak calls
+    // below (briefing, task prompts, corrections, recap) all no-op,
+    // and the UI renders the same text content directly. Explicit
+    // "Listen" buttons use playOnce() to bypass the gate.
+    mode,
     onUserSpeech: async (text) => {
       setAnswer(text);
       // For voice tasks, auto-submit
@@ -340,7 +359,13 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
     return (
       <div className="flex flex-col items-center gap-6 sm:gap-8">
         <p className="text-ink-200 text-center max-w-md">{briefing || 'Ready when you are.'}</p>
-        <VoiceOrb state="idle" size="xl" onTap={onOrbTap} ariaLabel="Begin lesson" />
+        <VoiceOrb
+          state="idle"
+          size={mode === 'text' ? 'md' : 'xl'}
+          onTap={onOrbTap}
+          ariaLabel="Begin lesson"
+        />
+        <ModeToggle mode={mode} setMode={setMode} />
         <button
           onClick={startSession}
           disabled={pending}
@@ -415,7 +440,16 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
         </div>
       </div>
 
-      <VoiceOrb state={tutor.state} size="lg" amplitude={tutor.amplitude} onTap={onOrbTap} />
+      <ModeToggle mode={mode} setMode={setMode} />
+
+      {/* Orb shrinks in text mode so the prompt + answer area is the
+          focus. It's still tappable for those who want to speak. */}
+      <VoiceOrb
+        state={tutor.state}
+        size={mode === 'text' ? 'sm' : 'lg'}
+        amplitude={tutor.amplitude}
+        onTap={onOrbTap}
+      />
 
       <AnimatePresence mode="wait">
         <motion.div
@@ -470,6 +504,23 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
               {currentTask?.prompt}
             </p>
           )}
+          {/* In text mode, expose a "Listen" affordance for any task prompt
+              so users can hear the Italian out loud on demand even though
+              auto-narration is off. Skipped for listening_comprehension
+              tasks because those already auto-play the script + provide
+              a "Replay" button (see above). */}
+          {mode === 'text' &&
+            currentTask?.prompt &&
+            currentTask.taskType !== 'listening_comprehension' && (
+              <button
+                type="button"
+                onClick={() => void tutor.playOnce(currentTask.prompt)}
+                className="mt-3 inline-flex items-center gap-1.5 text-xs text-ink-300 hover:text-ink-50 transition"
+                aria-label="Listen to this prompt"
+              >
+                <Volume2 size={12} aria-hidden /> Listen
+              </button>
+            )}
         </motion.div>
       </AnimatePresence>
 
@@ -499,10 +550,11 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
         </motion.div>
       )}
 
-      {/* Voice answer ergonomics + collapsed text fallback */}
+      {/* Voice answer ergonomics + collapsed text fallback. In text
+          mode the input shows by default — typing IS the primary path. */}
       {phase === 'task' && !opts && (
         <div className="flex flex-col items-center gap-3 w-full max-w-xl">
-          {!showText ? (
+          {mode === 'voice' && !showText ? (
             <button
               onClick={() => setShowText(true)}
               className="text-sm text-ink-200 hover:text-ink-50 underline-offset-4 hover:underline"
@@ -573,5 +625,44 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
 
       <p className="text-xs text-ink-200">{statusText()}</p>
     </div>
+  );
+}
+
+/**
+ * Small inline chip to flip between voice and text mode mid-lesson.
+ * Doesn't persist to the profile — just changes the current session's
+ * mode. The profile default is set on /profile.
+ */
+function ModeToggle({
+  mode,
+  setMode,
+}: {
+  mode: 'voice' | 'text';
+  setMode: (m: 'voice' | 'text') => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => setMode(mode === 'voice' ? 'text' : 'voice')}
+      className="inline-flex items-center gap-1.5 rounded-full surface px-3 py-1 text-xs text-ink-200 hover:text-ink-50 hover:border-wise-500/40 transition"
+      title={
+        mode === 'voice'
+          ? 'Switch to text — type your answers'
+          : 'Switch to voice — answer out loud'
+      }
+    >
+      {mode === 'voice' ? (
+        <>
+          <Mic size={12} className="text-wise-300" aria-hidden />
+          <span>Voice</span>
+        </>
+      ) : (
+        <>
+          <MessageSquareText size={12} className="text-wise-300" aria-hidden />
+          <span>Text</span>
+        </>
+      )}
+      <span className="opacity-60">· tap to flip</span>
+    </button>
   );
 }

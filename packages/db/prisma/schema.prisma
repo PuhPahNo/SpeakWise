@@ -60,6 +60,14 @@ enum WisePersonality {
   casual_companion
 }
 
+/// Default UI mode for Wise interactions. `voice` is the original
+/// orb-first experience; `text` is a read-and-type chat experience that
+/// doesn't auto-narrate. Each screen can flip mode per-session.
+enum InteractionMode {
+  voice
+  text
+}
+
 enum SkillCategory {
   pronunciation
   vocabulary
@@ -283,6 +291,11 @@ model LearnerProfile {
   /// request from the learner's CEFR level + mastery progress so it
   /// adapts naturally (no manual chip on the home page).
   languageRatioOverridden         Boolean         @default(false) @map("language_ratio_overridden")
+  /// Default UI mode for Wise interactions:
+  ///   voice — Wise auto-speaks and the learner answers by voice (orb-first).
+  ///   text  — Wise shows text immediately, no auto-narration, learner types.
+  /// Each screen can still flip mode for the session; this is the default.
+  preferredInteractionMode        InteractionMode @default(voice) @map("preferred_interaction_mode")
   onboardingCompleted             Boolean         @default(false) @map("onboarding_completed")
   createdAt                       DateTime        @default(now()) @map("created_at")
   updatedAt                       DateTime        @updatedAt @map("updated_at")

@@ -18,6 +18,7 @@ export default async function CommandCenterPage() {
       <CommandCenter
         firstName={firstName}
         sessionMinutes={profile.preferredSessionLengthMinutes ?? 10}
+        defaultMode={profile.preferredInteractionMode === 'text' ? 'text' : 'voice'}
       />
     </div>
   );
