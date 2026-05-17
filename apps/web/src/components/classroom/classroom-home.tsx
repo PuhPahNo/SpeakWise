@@ -141,9 +141,7 @@ export function ClassroomHome({ initialProfile, initialStudents }: Props) {
       )}
 
       <div>
-        <h1 className="font-display text-2xl sm:text-3xl text-ink-50 leading-tight">
-          Classroom
-        </h1>
+        <h1 className="font-display text-2xl sm:text-3xl text-ink-50 leading-tight">Classroom</h1>
         {profile.displayName && (
           <p className="text-sm text-ink-200 mt-1">Welcome back, {profile.displayName}.</p>
         )}
@@ -178,9 +176,8 @@ export function ClassroomHome({ initialProfile, initialStudents }: Props) {
         </div>
         <p className="text-sm text-ink-200 mt-3 leading-relaxed">
           Share this code with your students. They paste it under{' '}
-          <span className="text-ink-100">Profile → Connect a tutor</span> to link
-          their account to yours. Anyone with this code can connect — rotate it
-          if it leaks.
+          <span className="text-ink-100">Profile → Connect a tutor</span> to link their account to
+          yours. Anyone with this code can connect — rotate it if it leaks.
         </p>
       </section>
 
@@ -219,11 +216,13 @@ export function ClassroomHome({ initialProfile, initialStudents }: Props) {
                         </span>
                       )}
                       <span>
-                        <span className="text-ink-50 font-medium">{s.streakDays}</span>{' '}
-                        day{s.streakDays === 1 ? '' : 's'}
+                        <span className="text-ink-50 font-medium">{s.streakDays}</span> day
+                        {s.streakDays === 1 ? '' : 's'}
                       </span>
                       <span>
-                        <span className="text-ink-50 font-medium">{s.xpTotal.toLocaleString()}</span>{' '}
+                        <span className="text-ink-50 font-medium">
+                          {s.xpTotal.toLocaleString()}
+                        </span>{' '}
                         XP
                       </span>
                       {s.activeDirectiveCount > 0 && (

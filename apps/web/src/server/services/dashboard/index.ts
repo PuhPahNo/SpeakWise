@@ -191,8 +191,7 @@ export async function getFluencyDashboard(userId: string): Promise<DashboardData
   const totalAtLevel = skillsAtLevel.length;
   const cefrProgress: CefrProgress = {
     current: currentLevel,
-    nextLevel:
-      CEFR_ORDER[CEFR_ORDER.indexOf(currentLevel) + 1] ?? null,
+    nextLevel: CEFR_ORDER[CEFR_ORDER.indexOf(currentLevel) + 1] ?? null,
     percent: totalAtLevel > 0 ? masteredAtLevel / totalAtLevel : 0,
     masteredCount: masteredAtLevel,
     totalAtLevel,
@@ -360,9 +359,7 @@ export async function getFluencyDashboard(userId: string): Promise<DashboardData
 
   // ── isFresh: brand-new account heuristic ─────────────────────────
   const isFresh =
-    allProgress.length === 0 &&
-    completedSessions30.length === 0 &&
-    completedLessons30.length === 0;
+    allProgress.length === 0 && completedSessions30.length === 0 && completedLessons30.length === 0;
 
   // ── Compute current effective languageRatio (matches profile svc) ─
   // We don't reimport from profile to keep this service standalone;

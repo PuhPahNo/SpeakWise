@@ -53,8 +53,7 @@ export function InteractionModeCard({ initial }: Props) {
       <div>
         <h2 className="font-display text-lg text-ink-50">How do you want to talk with Wise?</h2>
         <p className="text-sm text-ink-200 mt-1">
-          Pick a default. Every screen still has a quick toggle if you want to flip for one
-          session.
+          Pick a default. Every screen still has a quick toggle if you want to flip for one session.
         </p>
       </div>
 
@@ -108,14 +107,12 @@ function Tile({
       }`}
     >
       <div className="flex items-center gap-2">
-        <Icon
-          size={16}
-          className={selected ? 'text-wise-300' : 'text-ink-300'}
-          aria-hidden
-        />
+        <Icon size={16} className={selected ? 'text-wise-300' : 'text-ink-300'} aria-hidden />
         <span className="font-medium">{title}</span>
         {selected && (
-          <span className="text-[10px] uppercase tracking-wider text-wise-300 ml-auto">Default</span>
+          <span className="text-[10px] uppercase tracking-wider text-wise-300 ml-auto">
+            Default
+          </span>
         )}
       </div>
       <p className={`text-xs mt-2 leading-relaxed ${selected ? 'text-ink-100' : 'text-ink-300'}`}>

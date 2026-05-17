@@ -43,9 +43,7 @@ export function CefrHero({
       </div>
       <div className="mt-2 flex items-baseline gap-3 flex-wrap">
         <h2 className="font-display text-3xl sm:text-4xl text-ink-50">{currentLabel}</h2>
-        {currentCode && (
-          <span className="text-sm text-ink-300 font-mono">{currentCode}</span>
-        )}
+        {currentCode && <span className="text-sm text-ink-300 font-mono">{currentCode}</span>}
       </div>
 
       <div className="mt-5">

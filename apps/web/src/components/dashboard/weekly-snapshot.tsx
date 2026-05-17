@@ -26,18 +26,14 @@ export function WeeklySnapshot({ weekly }: { weekly: Weekly }) {
         Icon={Calendar}
         label="This week"
         value={weekly.daysPracticedThisWeek.toString()}
-        unit={`of 7 days`}
+        unit={'of 7 days'}
       />
       <Stat
         Icon={BookOpen}
         label="Lessons this week"
         value={weekly.lessonsCompletedThisWeek.toString()}
       />
-      <Stat
-        Icon={Sparkles}
-        label="Total XP"
-        value={weekly.xpTotal.toLocaleString()}
-      />
+      <Stat Icon={Sparkles} label="Total XP" value={weekly.xpTotal.toLocaleString()} />
     </section>
   );
 }

@@ -85,10 +85,7 @@ export function ProfileEditor({ profile }: { profile: Profile }) {
         </select>
       </Field>
       <Field label="Correction style">
-        <select
-          value={correctionStyle}
-          onChange={(e) => setCorrectionStyle(e.target.value)}
-        >
+        <select value={correctionStyle} onChange={(e) => setCorrectionStyle(e.target.value)}>
           <option value="adaptive">Adaptive</option>
           <option value="gentle">Gentle</option>
           <option value="direct">Direct</option>
@@ -106,11 +103,7 @@ export function ProfileEditor({ profile }: { profile: Profile }) {
         />
       </Field>
       <Field label="Notes (motivation, context)">
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={3}
-        />
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
       </Field>
       <Field label="Wise's voice">
         <VoicePicker value={voiceId} onChange={setVoiceId} />

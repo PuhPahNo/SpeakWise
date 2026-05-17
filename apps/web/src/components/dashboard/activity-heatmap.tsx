@@ -19,9 +19,7 @@ export function ActivityHeatmap({ days }: { days: ActivityDay[] }) {
             <div
               key={d.date}
               title={`${d.date} — ${d.sessions} session${d.sessions === 1 ? '' : 's'}`}
-              className={`aspect-square rounded-md ${
-                empty ? 'bg-white/4' : ''
-              }`}
+              className={`aspect-square rounded-md ${empty ? 'bg-white/4' : ''}`}
               style={
                 empty
                   ? undefined
@@ -39,9 +37,15 @@ export function ActivityHeatmap({ days }: { days: ActivityDay[] }) {
         <div className="flex items-center gap-1">
           <span>less</span>
           <div className="w-2 h-2 rounded-sm bg-white/4" />
-          <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: 'rgba(224,136,24,0.35)' }} />
+          <div
+            className="w-2 h-2 rounded-sm"
+            style={{ backgroundColor: 'rgba(224,136,24,0.35)' }}
+          />
           <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: 'rgba(224,136,24,0.6)' }} />
-          <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: 'rgba(224,136,24,0.85)' }} />
+          <div
+            className="w-2 h-2 rounded-sm"
+            style={{ backgroundColor: 'rgba(224,136,24,0.85)' }}
+          />
           <span>more</span>
         </div>
         <span>today</span>

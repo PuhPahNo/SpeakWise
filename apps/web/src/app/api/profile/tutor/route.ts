@@ -1,9 +1,9 @@
 import { withAuth, withAuthAndJson } from '@/lib/api/route-handler';
 import {
+  InviteCodeNotFoundError,
   disconnectTutor,
   getActiveTutorForStudent,
   linkStudentByCode,
-  InviteCodeNotFoundError,
 } from '@/server/services/classroom';
 import { ConnectTutorRequestSchema } from '@speakwise/schemas';
 import { NextResponse } from 'next/server';

@@ -1,9 +1,6 @@
 import { ClassroomHome } from '@/components/classroom/classroom-home';
 import { getOrCreateUser } from '@/lib/auth/current-user';
-import {
-  getTutorProfile,
-  listStudentsForTutor,
-} from '@/server/services/classroom';
+import { getTutorProfile, listStudentsForTutor } from '@/server/services/classroom';
 import { redirect } from 'next/navigation';
 
 export default async function ClassroomPage() {

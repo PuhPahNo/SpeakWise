@@ -1,7 +1,7 @@
 import { withTutorAuth, withTutorAuthAndJson } from '@/lib/api/route-handler';
 import { getTutorProfile } from '@/server/services/classroom';
-import { PatchTutorProfileRequestSchema } from '@speakwise/schemas';
 import { prisma } from '@speakwise/db';
+import { PatchTutorProfileRequestSchema } from '@speakwise/schemas';
 
 export async function GET() {
   return withTutorAuth(async ({ userId }) => {

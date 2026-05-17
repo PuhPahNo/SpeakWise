@@ -70,10 +70,7 @@ export function TutorCard() {
           tutorDisplayName: data.tutorDisplayName ?? null,
         });
         setCodeInput('');
-        toast.success(
-          'Connected',
-          `You're linked to ${data.tutorDisplayName ?? data.tutorName}.`,
-        );
+        toast.success('Connected', `You're linked to ${data.tutorDisplayName ?? data.tutorName}.`);
       }
     } catch (err) {
       toast.error('Could not connect', err instanceof Error ? err.message : 'Try again.');

@@ -61,10 +61,7 @@ export function LanguageBalanceCard({ initial }: Props) {
       await persist({ languageRatio: next, languageRatioOverridden: true });
       setRatio(next);
       setOverridden(true);
-      toast.success(
-        'Saved',
-        `Wise will aim for ${Math.round(next * 100)}% Italian going forward.`,
-      );
+      toast.success('Saved', `Wise will aim for ${Math.round(next * 100)}% Italian going forward.`);
     } catch {
       /* toast already shown */
     }

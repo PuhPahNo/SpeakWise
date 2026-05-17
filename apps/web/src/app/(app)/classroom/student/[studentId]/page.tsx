@@ -1,6 +1,6 @@
 import { StudentDetail } from '@/components/classroom/student-detail';
 import { getOrCreateUser } from '@/lib/auth/current-user';
-import { getStudentDetailForTutor, StudentNotLinkedError } from '@/server/services/classroom';
+import { StudentNotLinkedError, getStudentDetailForTutor } from '@/server/services/classroom';
 import { prisma } from '@speakwise/db';
 import { notFound, redirect } from 'next/navigation';
 
@@ -13,7 +13,7 @@ export default async function StudentDetailPage({
   const user = await getOrCreateUser();
   if (user.role !== 'tutor') redirect('/command-center');
 
-  let detail;
+  let detail: Awaited<ReturnType<typeof getStudentDetailForTutor>>;
   try {
     detail = await getStudentDetailForTutor(user.id, studentId);
   } catch (e) {

@@ -41,9 +41,7 @@ export function ComingNext({ skills, directive }: Props) {
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <div className="text-sm text-ink-50 font-medium truncate">{s.name}</div>
-                <div className="text-xs text-ink-300">
-                  {s.category.replace(/_/g, ' ')}
-                </div>
+                <div className="text-xs text-ink-300">{s.category.replace(/_/g, ' ')}</div>
               </div>
               {s.pinnedByTutor && (
                 <span

@@ -30,9 +30,7 @@ export function SkillCardList({ heading, subheading, skills, variant, showBreakd
       <div className="flex items-baseline justify-between mb-3 gap-3 flex-wrap">
         <div>
           <h2 className={`font-display text-lg sm:text-xl ${ACCENT[variant]}`}>{heading}</h2>
-          {subheading && (
-            <p className="text-xs text-ink-300 mt-0.5">{subheading}</p>
-          )}
+          {subheading && <p className="text-xs text-ink-300 mt-0.5">{subheading}</p>}
         </div>
       </div>
       <ul className="space-y-2">
@@ -42,10 +40,8 @@ export function SkillCardList({ heading, subheading, skills, variant, showBreakd
               <div className="min-w-0">
                 <div className="text-sm text-ink-50 font-medium truncate">{s.name}</div>
                 <div className="text-xs text-ink-300">
-                  {s.category.replace(/_/g, ' ')} ·{' '}
-                  {s.status.replace(/_/g, ' ')}
-                  {s.lastPracticedAt &&
-                    ` · ${formatRelative(new Date(s.lastPracticedAt))}`}
+                  {s.category.replace(/_/g, ' ')} · {s.status.replace(/_/g, ' ')}
+                  {s.lastPracticedAt && ` · ${formatRelative(new Date(s.lastPracticedAt))}`}
                 </div>
               </div>
               <div className="text-xs text-ink-200 shrink-0">

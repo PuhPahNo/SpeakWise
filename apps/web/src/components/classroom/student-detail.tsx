@@ -1,7 +1,7 @@
 'use client';
 
 import { useToast } from '@/components/ui/toast';
-import { ArrowLeft, ClipboardList, Send, Sparkles, Flame } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Flame, Send, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -188,9 +188,9 @@ export function StudentDetail({ detail, allSkills }: Props) {
           </div>
         </div>
         <p className="text-sm text-ink-200 mb-3 leading-relaxed">
-          Tell Wise what {detail.student.name.split(' ')[0]} should focus on. Wise
-          will fold it into the next lesson's briefing and skew the task mix
-          toward any skills you pin. Sending replaces any older active directive.
+          Tell Wise what {detail.student.name.split(' ')[0]} should focus on. Wise will fold it into
+          the next lesson's briefing and skew the task mix toward any skills you pin. Sending
+          replaces any older active directive.
         </p>
         <textarea
           value={body}
@@ -362,7 +362,9 @@ export function StudentDetail({ detail, allSkills }: Props) {
           <ul className="space-y-2">
             {detail.recentMistakes.slice(0, 5).map((m) => (
               <li key={m.id} className="surface rounded-xl p-3 sm:p-4 text-sm">
-                <div className="text-ink-100">they said: <span className="italic">{m.userAnswer}</span></div>
+                <div className="text-ink-100">
+                  they said: <span className="italic">{m.userAnswer}</span>
+                </div>
                 {m.correctedAnswer && (
                   <div className="text-ink-200 mt-1">
                     better: <span className="italic text-ink-50">{m.correctedAnswer}</span>

@@ -74,10 +74,7 @@ export function defaultLanguageRatio(level: string): number {
  * keeps the bump from spilling into the next level's band before
  * they've actually advanced.
  */
-export async function computeAutoLanguageRatio(
-  userId: string,
-  level: string,
-): Promise<number> {
+export async function computeAutoLanguageRatio(userId: string, level: string): Promise<number> {
   const base = defaultLanguageRatio(level);
   // Skills at the learner's CURRENT level
   const skillsAtLevel = await prisma.curriculumSkill.findMany({

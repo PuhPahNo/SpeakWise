@@ -52,7 +52,7 @@ test('onboarding orb tap: trace the full network + console flow', async ({
   const speakHit = page.waitForResponse((r) => r.url().includes('/api/voice/speak'), {
     timeout: 30_000,
   });
-  const phaseChanged = page
+  const _phaseChanged = page
     .getByText(/Wise is warming up|Wise is thinking|Wise is speaking/i)
     .first()
     .waitFor({ timeout: 30_000 });

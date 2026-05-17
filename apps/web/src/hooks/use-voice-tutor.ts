@@ -441,55 +441,58 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
   // Used by text-mode UIs that put a small "Listen" button next to a
   // Wise message. Always plays. Never auto-listens. Doesn't change the
   // hook's persistent state machine — drops back to idle on end.
-  const playOnce = useCallback(async (text: string): Promise<boolean> => {
-    if (!text.trim()) return false;
-    if (playerRef.current) {
-      playerRef.current.pause();
-      playerRef.current = null;
-    }
-    setState('thinking');
-    let played = false;
-    try {
-      const res = await fetch('/api/voice/speak', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, language: opts.ttsLanguage ?? 'auto' }),
-      });
-      if (!res.ok) throw new Error(`tts failed: ${res.status}`);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      playerRef.current = audio;
-      setState('speaking');
-      await new Promise<void>((resolve) => {
-        audio.onended = () => {
-          URL.revokeObjectURL(url);
-          resolve();
-        };
-        audio.onerror = () => {
-          URL.revokeObjectURL(url);
-          resolve();
-        };
-        audio
-          .play()
-          .then(() => {
-            played = true;
-            setAudioPrimed(true);
-          })
-          .catch((err) => {
-            console.warn('voice tutor: playOnce rejected', err?.message ?? err);
+  const playOnce = useCallback(
+    async (text: string): Promise<boolean> => {
+      if (!text.trim()) return false;
+      if (playerRef.current) {
+        playerRef.current.pause();
+        playerRef.current = null;
+      }
+      setState('thinking');
+      let played = false;
+      try {
+        const res = await fetch('/api/voice/speak', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, language: opts.ttsLanguage ?? 'auto' }),
+        });
+        if (!res.ok) throw new Error(`tts failed: ${res.status}`);
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        playerRef.current = audio;
+        setState('speaking');
+        await new Promise<void>((resolve) => {
+          audio.onended = () => {
             URL.revokeObjectURL(url);
             resolve();
-          });
-      });
-    } catch (e) {
-      console.error('voice tutor: playOnce failed', e);
-    } finally {
-      if (playerRef.current?.paused !== false) playerRef.current = null;
-      setState('idle');
-    }
-    return played;
-  }, [opts.ttsLanguage]);
+          };
+          audio.onerror = () => {
+            URL.revokeObjectURL(url);
+            resolve();
+          };
+          audio
+            .play()
+            .then(() => {
+              played = true;
+              setAudioPrimed(true);
+            })
+            .catch((err) => {
+              console.warn('voice tutor: playOnce rejected', err?.message ?? err);
+              URL.revokeObjectURL(url);
+              resolve();
+            });
+        });
+      } catch (e) {
+        console.error('voice tutor: playOnce failed', e);
+      } finally {
+        if (playerRef.current?.paused !== false) playerRef.current = null;
+        setState('idle');
+      }
+      return played;
+    },
+    [opts.ttsLanguage],
+  );
 
   return {
     state,

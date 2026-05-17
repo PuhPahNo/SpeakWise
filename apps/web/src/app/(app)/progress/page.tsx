@@ -42,9 +42,7 @@ export default async function ProgressPage() {
 
       {/* Activity heatmap — last 30 days */}
       <section>
-        <h2 className="text-[11px] uppercase tracking-[0.2em] text-ink-200 mb-3">
-          Last 30 days
-        </h2>
+        <h2 className="text-[11px] uppercase tracking-[0.2em] text-ink-200 mb-3">Last 30 days</h2>
         <ActivityHeatmap days={dashboard.activity30} />
       </section>
 
@@ -80,10 +78,7 @@ export default async function ProgressPage() {
       )}
 
       {/* Coming next — what Wise will focus on, plus tutor directive */}
-      <ComingNext
-        skills={dashboard.comingNext}
-        directive={dashboard.tutorDirective}
-      />
+      <ComingNext skills={dashboard.comingNext} directive={dashboard.tutorDirective} />
 
       {/* Vocabulary snapshot — counts + Review N due CTA */}
       <VocabularySnapshot
@@ -93,9 +88,7 @@ export default async function ProgressPage() {
       />
 
       {/* Recent lessons */}
-      {dashboard.recentLessons.length > 0 && (
-        <RecentLessons lessons={dashboard.recentLessons} />
-      )}
+      {dashboard.recentLessons.length > 0 && <RecentLessons lessons={dashboard.recentLessons} />}
 
       {/* Wise's weekly narrative (existing component) */}
       <section>

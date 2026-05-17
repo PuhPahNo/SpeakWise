@@ -455,7 +455,9 @@ async function main() {
   // overshoots — that catches regressions like the user's reported
   // "Il vocabolario del cibo al ristorante" title for a beginner.
   const titleStats = countItalianRatio(firstLesson.title);
-  log(`    title italian-ratio: ${(titleStats.ratio * 100).toFixed(0)}% (${titleStats.it}/${titleStats.total})`);
+  log(
+    `    title italian-ratio: ${(titleStats.ratio * 100).toFixed(0)}% (${titleStats.it}/${titleStats.total})`,
+  );
   if (titleStats.ratio <= 0.5) {
     pass('beginner title respects ratio');
   } else {
@@ -961,7 +963,7 @@ async function main() {
     data: {
       username: tutorUsername,
       passwordHash: await bcrypt.hash(password, 12),
-      name: `QA Tutor`,
+      name: 'QA Tutor',
       role: 'tutor',
       nativeLanguage: 'en',
       targetLanguage: 'it',
@@ -1006,10 +1008,7 @@ async function main() {
   if (connectRes.status === 200 && connectRes.data.connected) {
     pass('student linked', `to ${connectRes.data.tutorName}`);
   } else {
-    fail(
-      'POST /api/profile/tutor',
-      `status ${connectRes.status}: ${connectRes.raw.slice(0, 200)}`,
-    );
+    fail('POST /api/profile/tutor', `status ${connectRes.status}: ${connectRes.raw.slice(0, 200)}`);
   }
 
   // Verify the link exists in DB
@@ -1025,7 +1024,10 @@ async function main() {
     '/api/classroom/students',
     tutorCookie,
   );
-  if (studentsRes.status === 200 && studentsRes.data.students.some((s) => s.studentId === user.id)) {
+  if (
+    studentsRes.status === 200 &&
+    studentsRes.data.students.some((s) => s.studentId === user.id)
+  ) {
     pass('GET /api/classroom/students includes the new link');
   } else {
     fail(
@@ -1049,7 +1051,7 @@ async function main() {
   if (dirRes.status !== 200 || !dirRes.data.directive?.id) {
     fail('POST /api/classroom/directives', `status ${dirRes.status}: ${dirRes.raw.slice(0, 200)}`);
   } else {
-    pass('directive created', dirRes.data.directive.id.slice(0, 8) + '…');
+    pass('directive created', `${dirRes.data.directive.id.slice(0, 8)}…`);
   }
 
   // Student generates a new lesson — should be driven by the directive
@@ -1060,9 +1062,12 @@ async function main() {
     { lessonType: 'daily_mission' },
   );
   if (dirLessonRes.status !== 200) {
-    fail('directive lesson generate', `status ${dirLessonRes.status}: ${dirLessonRes.raw.slice(0, 200)}`);
+    fail(
+      'directive lesson generate',
+      `status ${dirLessonRes.status}: ${dirLessonRes.raw.slice(0, 200)}`,
+    );
   } else {
-    pass('lesson generated under directive', dirLessonRes.data.lesson.id.slice(0, 8) + '…');
+    pass('lesson generated under directive', `${dirLessonRes.data.lesson.id.slice(0, 8)}…`);
     const dbLesson = await prisma.lesson.findUnique({
       where: { id: dirLessonRes.data.lesson.id },
       include: { tasks: true },
@@ -1092,7 +1097,7 @@ async function main() {
       | string
       | undefined;
     if (briefing && /tutor|past tense|passato|past-tense/i.test(briefing)) {
-      pass('lesson briefing references the directive', briefing.slice(0, 80) + '…');
+      pass('lesson briefing references the directive', `${briefing.slice(0, 80)}…`);
     } else {
       fail('directive briefing', `no tutor/past-tense reference in: "${briefing?.slice(0, 100)}"`);
     }
@@ -1147,7 +1152,7 @@ async function main() {
   if (dashRes.status !== 200) {
     fail('GET /api/dashboard', `status ${dashRes.status}: ${dashRes.raw.slice(0, 200)}`);
   } else {
-    pass('GET /api/dashboard', `status 200`);
+    pass('GET /api/dashboard', 'status 200');
     const d = dashRes.data;
     // Identity
     if (d.cefrProgress.current === 'beginner') pass('cefr current matches profile');
@@ -1177,7 +1182,7 @@ async function main() {
       );
     // Tutor directive passthrough
     if (d.tutorDirective?.body)
-      pass('dashboard surfaces tutor directive body', d.tutorDirective.body.slice(0, 60) + '…');
+      pass('dashboard surfaces tutor directive body', `${d.tutorDirective.body.slice(0, 60)}…`);
     else fail('dashboard tutor directive missing', 'expected directive after Phase 12');
     // Recent lessons should include the lessons we ran
     if (d.recentLessons.length >= 1)
