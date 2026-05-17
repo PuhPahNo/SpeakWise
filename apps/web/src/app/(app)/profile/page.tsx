@@ -1,11 +1,21 @@
+import { LanguageBalanceCard } from '@/components/profile/language-balance-card';
 import { ProfileEditor } from '@/components/profile/profile-editor';
+import { TutorCard } from '@/components/profile/tutor-card';
 import { WiseRemembers } from '@/components/profile/wise-remembers';
 import { getOrCreateUser } from '@/lib/auth/current-user';
-import { ensureProfile } from '@/server/services/profile';
+import { computeAutoLanguageRatio, ensureProfile } from '@/server/services/profile';
 
 export default async function ProfilePage() {
   const user = await getOrCreateUser();
   const profile = await ensureProfile(user.id);
+  // Auto-ratio is recomputed each request; surface both the auto value
+  // and the (possibly overridden) stored value so the card can render
+  // the right state without needing a second API call client-side.
+  const autoLanguageRatio = await computeAutoLanguageRatio(user.id, profile.currentLevel);
+  const storedRatio = Number(profile.languageRatio ?? 0);
+  const overridden = Boolean(profile.languageRatioOverridden);
+  const effectiveRatio = overridden && storedRatio > 0 ? storedRatio : autoLanguageRatio;
+
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-10">
       <div>
@@ -14,6 +24,25 @@ export default async function ProfilePage() {
           What Wise remembers, and what you&apos;d like to change.
         </p>
       </div>
+
+      {/* Language preferences — used to live as a chip on the home page,
+          now properly settable here with auto-vs-override clarity. */}
+      <section>
+        <LanguageBalanceCard
+          initial={{
+            languageRatio: effectiveRatio,
+            autoLanguageRatio,
+            languageRatioOverridden: overridden,
+            immersionMode: profile.immersionMode,
+            currentLevel: profile.currentLevel,
+          }}
+        />
+      </section>
+
+      {/* Tutor link — used to live as a modal off the home page. */}
+      <section>
+        <TutorCard />
+      </section>
 
       <section>
         <div className="flex items-baseline justify-between mb-4">

@@ -53,13 +53,17 @@ export function ProfileEditor({ profile }: { profile: Profile }) {
     }
   }
 
+  // The container uses the same `surface` dark-glass treatment as every
+  // other card in the app. Previously we shipped `bg-white` here, which
+  // landed white text from globals.css on a white background (unreadable).
+  // Inputs / textareas / selects inherit the dark-theme styles from
+  // globals.css — no scoped `.sw-input` block needed anymore.
   return (
-    <div className="space-y-5 rounded-2xl border border-ink-200 bg-white p-4 sm:p-6">
+    <div className="space-y-5 surface rounded-2xl p-4 sm:p-6">
       <Field label="Goals (comma-separated)">
         <input
           value={goals}
           onChange={(e) => setGoals(e.target.value)}
-          className="sw-input"
           autoCapitalize="sentences"
         />
       </Field>
@@ -67,12 +71,11 @@ export function ProfileEditor({ profile }: { profile: Profile }) {
         <input
           value={interests}
           onChange={(e) => setInterests(e.target.value)}
-          className="sw-input"
           autoCapitalize="sentences"
         />
       </Field>
       <Field label="Current level">
-        <select value={level} onChange={(e) => setLevel(e.target.value)} className="sw-input">
+        <select value={level} onChange={(e) => setLevel(e.target.value)}>
           <option value="complete_beginner">Complete beginner</option>
           <option value="beginner">Beginner</option>
           <option value="lower_intermediate">Lower intermediate</option>
@@ -85,7 +88,6 @@ export function ProfileEditor({ profile }: { profile: Profile }) {
         <select
           value={correctionStyle}
           onChange={(e) => setCorrectionStyle(e.target.value)}
-          className="sw-input"
         >
           <option value="adaptive">Adaptive</option>
           <option value="gentle">Gentle</option>
@@ -101,14 +103,12 @@ export function ProfileEditor({ profile }: { profile: Profile }) {
           inputMode="numeric"
           value={duration}
           onChange={(e) => setDuration(Number(e.target.value))}
-          className="sw-input"
         />
       </Field>
       <Field label="Notes (motivation, context)">
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          className="sw-input"
           rows={3}
         />
       </Field>
@@ -119,20 +119,12 @@ export function ProfileEditor({ profile }: { profile: Profile }) {
         <button
           onClick={save}
           disabled={saving}
-          className="w-full sm:w-auto rounded-full bg-wise-500 text-white px-5 py-3 hover:bg-wise-600 disabled:opacity-50"
+          className="w-full sm:w-auto rounded-full bg-wise-500 text-ink-900 font-medium px-5 py-3 hover:bg-wise-600 disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Save'}
         </button>
-        {saved && <span className="text-sm text-emerald-700">Saved.</span>}
+        {saved && <span className="text-sm text-sage-400">Saved.</span>}
       </div>
-      <style jsx>{`
-        .sw-input {
-          width: 100%;
-          border: 1px solid #e5e3da;
-          border-radius: 0.5rem;
-          padding: 0.625rem 0.75rem;
-        }
-      `}</style>
     </div>
   );
 }
@@ -140,7 +132,7 @@ export function ProfileEditor({ profile }: { profile: Profile }) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <div className="text-sm font-medium text-ink-700 mb-1">{label}</div>
+      <div className="text-sm font-medium text-ink-200 mb-1">{label}</div>
       {children}
     </label>
   );

@@ -65,11 +65,14 @@ export function VoicePicker({
   }
 
   if (voices.length === 0) {
-    return <div className="text-sm text-ink-500">Loading voices…</div>;
+    return <div className="text-sm text-ink-300">Loading voices…</div>;
   }
 
   const effective = value ?? defaultVoiceId;
 
+  // Dark-theme card styling — selected uses a tinted wise-glow, unselected
+  // uses the standard surface treatment. Previously this rendered on a
+  // white background with pale-gold accents that were unreadable.
   return (
     <ul className="space-y-2">
       {voices.map((v) => {
@@ -80,15 +83,15 @@ export function VoicePicker({
             key={v.id}
             className={`flex items-center gap-3 rounded-xl border px-3 py-2 sm:py-3 transition ${
               selected
-                ? 'border-wise-500 bg-wise-50'
-                : 'border-ink-200 hover:border-ink-300 bg-white'
+                ? 'bg-wise-500/20 border-wise-500/60 text-ink-50'
+                : 'surface text-ink-100 hover:border-wise-500/40'
             }`}
           >
             <button
               type="button"
               onClick={() => preview(v.id)}
               aria-label={isPlaying ? `Stop preview of ${v.name}` : `Preview ${v.name}`}
-              className="shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-full bg-ink-100 hover:bg-ink-200"
+              className="shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/8 hover:bg-white/15 text-ink-50 transition"
             >
               {isPlaying ? <Pause size={16} /> : <Play size={16} />}
             </button>
@@ -98,16 +101,16 @@ export function VoicePicker({
               className="flex-1 min-w-0 text-left"
             >
               <div className="flex items-center gap-2">
-                <span className="font-medium">{v.name}</span>
+                <span className="font-medium text-ink-50">{v.name}</span>
                 {v.id === defaultVoiceId && (
-                  <span className="text-[10px] uppercase tracking-wider text-ink-500 bg-ink-100 px-1.5 py-0.5 rounded">
+                  <span className="text-[10px] uppercase tracking-wider text-ink-300 bg-white/8 px-1.5 py-0.5 rounded">
                     Default
                   </span>
                 )}
               </div>
-              <div className="text-sm text-ink-600 truncate">{v.shortDescription}</div>
+              <div className="text-sm text-ink-300 truncate">{v.shortDescription}</div>
             </button>
-            {selected && <Check size={18} className="text-wise-600 shrink-0" aria-hidden />}
+            {selected && <Check size={18} className="text-wise-300 shrink-0" aria-hidden />}
           </li>
         );
       })}

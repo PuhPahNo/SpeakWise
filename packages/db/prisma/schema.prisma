@@ -278,6 +278,11 @@ model LearnerProfile {
   languageRatio                   Decimal         @default(0.1) @map("language_ratio") @db.Decimal(3, 2)
   /// Hard "Italian-only" toggle. Overrides languageRatio when true.
   immersionMode                   Boolean         @default(false) @map("immersion_mode")
+  /// When true, the stored `languageRatio` is a manual override the user
+  /// set on the profile page. When false, the ratio is recomputed each
+  /// request from the learner's CEFR level + mastery progress so it
+  /// adapts naturally (no manual chip on the home page).
+  languageRatioOverridden         Boolean         @default(false) @map("language_ratio_overridden")
   onboardingCompleted             Boolean         @default(false) @map("onboarding_completed")
   createdAt                       DateTime        @default(now()) @map("created_at")
   updatedAt                       DateTime        @updatedAt @map("updated_at")

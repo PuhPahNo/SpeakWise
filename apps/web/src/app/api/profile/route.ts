@@ -20,6 +20,7 @@ export async function PATCH(req: Request) {
       motivationNotes: body.motivationNotes,
       wiseVoiceId: body.wiseVoiceId,
       languageRatio: body.languageRatio,
+      languageRatioOverridden: body.languageRatioOverridden,
       immersionMode: body.immersionMode,
     });
   });

@@ -49,6 +49,13 @@ export const PatchProfileRequestSchema = z.object({
   wiseVoiceId: z.string().min(8).max(64).optional(),
   /** 0.0–1.0 share of Wise's spoken output that should be Italian. */
   languageRatio: z.number().min(0).max(1).optional(),
+  /**
+   * Whether the languageRatio above should be treated as a manual
+   * override. When false (the default), Wise auto-computes the ratio
+   * from the learner's level + mastery; when true, the stored value
+   * is what's served on reads.
+   */
+  languageRatioOverridden: z.boolean().optional(),
   /** Hard "Italian-only" mode toggle — overrides languageRatio. */
   immersionMode: z.boolean().optional(),
 });

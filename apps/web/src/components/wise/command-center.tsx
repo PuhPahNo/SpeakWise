@@ -3,7 +3,7 @@
 import { useToast } from '@/components/ui/toast';
 import { VoiceOrb } from '@/components/voice/voice-orb';
 import { useVoiceTutor } from '@/hooks/use-voice-tutor';
-import { Flame, Globe, GraduationCap, Sparkles, X } from 'lucide-react';
+import { Flame, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
@@ -49,21 +49,12 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
   const [userLine, setUserLine] = useState<string>('');
   const [pending, setPending] = useState(false);
   const greetedRef = useRef(false);
-  // Italian language settings — fetched once on mount so the toggle
-  // shows the current state immediately.
+  // Italian language settings — fetched on mount so the bilingual
+  // labels (Inizia/Start, Ripasso/Review) pick the right word. The
+  // immersion + tutor controls themselves now live on /profile, not
+  // on this voice-first home page.
   const [languageRatio, setLanguageRatio] = useState<number>(0.1);
   const [immersionMode, setImmersionMode] = useState<boolean>(false);
-  // Tutor link state. `null` = no tutor; set when the learner is linked
-  // to one. The "Connect a tutor" chip opens a modal to enter a code.
-  // Named `linkedTutor` (not `tutor`) so it doesn't collide with the
-  // `tutor` variable returned by `useVoiceTutor` above.
-  const [linkedTutor, setLinkedTutor] = useState<{
-    tutorUserId: string;
-    tutorName: string;
-    tutorDisplayName: string | null;
-  } | null>(null);
-  const [showTutorModal, setShowTutorModal] = useState(false);
-  const [tutorCodeInput, setTutorCodeInput] = useState('');
 
   const tutor = useVoiceTutor({
     // Auto-detect on both ends: the learner might reply in either
@@ -88,20 +79,12 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
     greetedRef.current = true;
     (async () => {
       try {
-        const [greetRes, summaryRes, comebackRes, profileRes, tutorRes] = await Promise.all([
+        const [greetRes, summaryRes, comebackRes, profileRes] = await Promise.all([
           fetch('/api/wise/greeting').then((r) => r.json() as Promise<GreetingResponse>),
           fetch('/api/gamification/summary').then((r) => r.json() as Promise<SummaryResponse>),
           fetch('/api/gamification/comeback').then((r) => r.json() as Promise<ComebackResponse>),
           fetch('/api/profile').then(
             (r) => r.json() as Promise<{ languageRatio?: number; immersionMode?: boolean }>,
-          ),
-          fetch('/api/profile/tutor').then(
-            (r) =>
-              r.json() as Promise<{
-                tutor:
-                  | { tutorUserId: string; tutorName: string; tutorDisplayName: string | null }
-                  | null;
-              }>,
           ),
         ]);
         setGreeting(greetRes);
@@ -110,7 +93,6 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
         setWiseLine(greetRes.greeting);
         if (profileRes.languageRatio != null) setLanguageRatio(Number(profileRes.languageRatio));
         if (profileRes.immersionMode != null) setImmersionMode(Boolean(profileRes.immersionMode));
-        setLinkedTutor(tutorRes.tutor);
       } catch (e) {
         console.error('command-center boot failed', e);
       }
@@ -155,8 +137,19 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
           userRequest: 'Easy comeback lesson — re-engage and rebuild momentum.',
         }),
       });
+      // Surface failure visibly — previously this silently swallowed
+      // non-200 responses, so the user saw "nothing happens" on tap.
+      if (!gen.ok) {
+        const errBody = await gen.json().catch(() => ({}));
+        toast.error('Couldn’t build that lesson', errBody.message ?? 'Try again in a moment.');
+        return;
+      }
       const out = await gen.json();
       if (out.lesson?.id) router.push(`/lesson/${out.lesson.id}`);
+      else toast.error('Couldn’t build that lesson', 'No lesson id in response — try again.');
+    } catch (e) {
+      console.error('comeback lesson start failed', e);
+      toast.error('Network blip', 'Check your connection and try again.');
     } finally {
       setPending(false);
     }
@@ -214,41 +207,6 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
     } finally {
       setPending(false);
     }
-  }
-
-  // Toggle Italian-immersion. Persists to the profile so future Wise
-  // turns and lessons honor it. Optimistic local update for snappy feel.
-  async function toggleImmersion() {
-    const next = !immersionMode;
-    setImmersionMode(next);
-    try {
-      await fetch('/api/profile', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ immersionMode: next }),
-      });
-      toast.success(
-        next ? 'Modalità immersione attiva' : 'Immersion off',
-        next
-          ? 'Wise will speak only Italian until you toggle this back.'
-          : 'Wise is back to your usual language mix.',
-      );
-    } catch (e) {
-      // Roll back if the network blip fails the patch
-      setImmersionMode(!next);
-      console.error('immersion toggle failed', e);
-    }
-  }
-
-  // Map the stored ratio to a friendly label for the chip.
-  function ratioLabel(): string {
-    if (immersionMode) return 'Immersione';
-    const r = languageRatio;
-    if (r >= 0.85) return '~95% IT';
-    if (r >= 0.6) return '~70% IT';
-    if (r >= 0.35) return '~50% IT';
-    if (r >= 0.15) return '~25% IT';
-    return '~10% IT';
   }
 
   async function startMission() {
@@ -344,204 +302,8 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
         </div>
       )}
 
-      {/* Chip row — language-immersion + tutor link. Wrapping flex so on
-          narrow mobile the chips stack instead of overflowing. */}
-      <div className="flex items-center gap-2 flex-wrap justify-center">
-        {/* Italian-immersion chip — tap to flip the whole experience into
-            Italian-only mode (overrides languageRatio until tapped off). */}
-        <button
-          type="button"
-          onClick={toggleImmersion}
-          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs transition-all border ${
-            immersionMode
-              ? 'bg-wise-500/20 border-wise-500/60 text-wise-200'
-              : 'bg-white/3 border-white/10 text-ink-200 hover:border-wise-500/40'
-          }`}
-          aria-pressed={immersionMode}
-          title={
-            immersionMode ? 'Tap to leave full Italian immersion' : 'Tap for full Italian immersion'
-          }
-        >
-          <Globe
-            size={12}
-            className={immersionMode ? 'text-wise-300' : 'text-ink-300'}
-            aria-hidden
-          />
-          <span>{ratioLabel()}</span>
-          {immersionMode && <span className="opacity-70">· tap to exit</span>}
-        </button>
-
-        {/* Tutor chip — shows linked tutor name OR a "Connect a tutor" CTA. */}
-        <button
-          type="button"
-          onClick={() => setShowTutorModal(true)}
-          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs transition-all border ${
-            linkedTutor
-              ? 'bg-wise-500/15 border-wise-500/40 text-wise-200'
-              : 'bg-white/3 border-white/10 text-ink-200 hover:border-wise-500/40'
-          }`}
-          title={
-            linkedTutor
-              ? `Linked to ${linkedTutor.tutorDisplayName ?? linkedTutor.tutorName}`
-              : 'Link to a tutor'
-          }
-        >
-          <GraduationCap
-            size={12}
-            className={linkedTutor ? 'text-wise-300' : 'text-ink-300'}
-            aria-hidden
-          />
-          <span>
-            {linkedTutor
-              ? linkedTutor.tutorDisplayName ?? linkedTutor.tutorName
-              : 'Connect a tutor'}
-          </span>
-        </button>
-      </div>
-
-      {/* Tutor link modal */}
-      {showTutorModal && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="tutor-modal-title"
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur flex items-center justify-center p-4"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowTutorModal(false);
-          }}
-        >
-          <div className="surface rounded-2xl p-5 sm:p-6 w-full max-w-md relative">
-            <button
-              type="button"
-              onClick={() => setShowTutorModal(false)}
-              className="absolute top-3 right-3 text-ink-300 hover:text-ink-50"
-              aria-label="Close"
-            >
-              <X size={18} />
-            </button>
-            {linkedTutor ? (
-              <>
-                <div className="text-[11px] uppercase tracking-[0.2em] text-wise-400 mb-2">
-                  Your tutor
-                </div>
-                <h2 id="tutor-modal-title" className="font-display text-xl text-ink-50">
-                  {linkedTutor.tutorDisplayName ?? linkedTutor.tutorName}
-                </h2>
-                <p className="text-sm text-ink-200 mt-3">
-                  Wise will follow your tutor's directives when generating your lessons. Your
-                  progress and recent mistakes are visible to them.
-                </p>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (!confirm('Disconnect from your tutor?')) return;
-                    setPending(true);
-                    try {
-                      await fetch('/api/profile/tutor', { method: 'DELETE' });
-                      setLinkedTutor(null);
-                      setShowTutorModal(false);
-                      toast.success('Disconnected');
-                    } catch (e) {
-                      toast.error(
-                        'Failed to disconnect',
-                        e instanceof Error ? e.message : 'Try again.',
-                      );
-                    } finally {
-                      setPending(false);
-                    }
-                  }}
-                  disabled={pending}
-                  className="mt-4 rounded-full surface px-4 py-2 text-sm text-ink-200 hover:text-ink-50 hover:border-wise-500/40 transition disabled:opacity-50"
-                >
-                  Disconnect
-                </button>
-              </>
-            ) : (
-              <>
-                <div className="text-[11px] uppercase tracking-[0.2em] text-wise-400 mb-2">
-                  Connect a tutor
-                </div>
-                <h2 id="tutor-modal-title" className="font-display text-xl text-ink-50">
-                  Got an invite code?
-                </h2>
-                <p className="text-sm text-ink-200 mt-2 mb-4">
-                  Paste your tutor's 8-character code below. Once connected, they'll see your
-                  progress and can guide your lessons.
-                </p>
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    const code = tutorCodeInput.trim().toUpperCase();
-                    if (code.length < 6) {
-                      toast.error('Code too short', 'Should be 8 letters/digits.');
-                      return;
-                    }
-                    setPending(true);
-                    try {
-                      const r = await fetch('/api/profile/tutor', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ code }),
-                      });
-                      if (!r.ok) {
-                        if (r.status === 404) {
-                          toast.error('Code not found', 'Double-check with your tutor.');
-                          return;
-                        }
-                        throw new Error(`status ${r.status}`);
-                      }
-                      const data = (await r.json()) as {
-                        connected?: boolean;
-                        tutorUserId?: string;
-                        tutorName?: string;
-                        tutorDisplayName?: string | null;
-                      };
-                      if (data.connected && data.tutorUserId && data.tutorName) {
-                        setLinkedTutor({
-                          tutorUserId: data.tutorUserId,
-                          tutorName: data.tutorName,
-                          tutorDisplayName: data.tutorDisplayName ?? null,
-                        });
-                        setTutorCodeInput('');
-                        setShowTutorModal(false);
-                        toast.success(
-                          'Connected',
-                          `You're linked to ${data.tutorDisplayName ?? data.tutorName}.`,
-                        );
-                      }
-                    } catch (e) {
-                      toast.error(
-                        'Could not connect',
-                        e instanceof Error ? e.message : 'Try again.',
-                      );
-                    } finally {
-                      setPending(false);
-                    }
-                  }}
-                >
-                  <input
-                    value={tutorCodeInput}
-                    onChange={(e) => setTutorCodeInput(e.target.value.toUpperCase())}
-                    placeholder="ABC23XYZ"
-                    maxLength={12}
-                    autoCapitalize="characters"
-                    autoComplete="off"
-                    spellCheck={false}
-                    className="w-full tracking-[0.3em] text-center font-display text-xl"
-                  />
-                  <button
-                    type="submit"
-                    disabled={pending}
-                    className="mt-3 w-full rounded-full bg-wise-500 hover:bg-wise-600 disabled:opacity-50 text-ink-900 font-medium py-2.5"
-                  >
-                    {pending ? 'Connecting…' : 'Connect'}
-                  </button>
-                </form>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Language-immersion + tutor controls moved off the home page —
+          they live on /profile now. The home is voice-first. */}
 
       <h1 className="font-display text-2xl sm:text-3xl text-ink-50 leading-tight">
         Welcome back, {firstName}.
@@ -597,7 +359,9 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
           disabled={pending}
           className="text-left rounded-2xl p-5 sm:p-6 bg-wise-500 hover:bg-wise-600 active:bg-wise-700 text-ink-900 transition disabled:opacity-60"
         >
-          <div className="text-[11px] uppercase tracking-[0.2em] opacity-80">Inizia</div>
+          <div className="text-[11px] uppercase tracking-[0.2em] opacity-80">
+            {immersionMode || languageRatio > 0.5 ? 'Inizia' : 'Start'}
+          </div>
           <div className="font-display text-xl sm:text-2xl mt-2">Today&apos;s mission</div>
           <div className="text-sm mt-1 opacity-90">~{sessionMinutes} min</div>
         </button>
@@ -605,7 +369,9 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
           href="/vocabulary/review"
           className="text-left rounded-2xl p-5 sm:p-6 surface text-ink-50 hover:border-wise-500/40 transition"
         >
-          <div className="text-[11px] uppercase tracking-[0.2em] text-ink-200">Ripasso</div>
+          <div className="text-[11px] uppercase tracking-[0.2em] text-ink-200">
+            {immersionMode || languageRatio > 0.5 ? 'Ripasso' : 'Review'}
+          </div>
           <div className="font-display text-xl sm:text-2xl mt-2">
             {dueCount > 0 ? `${dueCount} due` : 'All caught up'}
           </div>

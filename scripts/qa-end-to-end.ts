@@ -726,10 +726,19 @@ async function main() {
       const sttData = (await sttBack.json()) as { text?: string; language?: string };
       const back = (sttData.text ?? '').toLowerCase();
       log(`    audio round-trip transcript: "${sttData.text}"`);
-      // The greeting always opens with "Ciao" — that single word is
-      // the must-survive marker for "we actually got Italian phonetics".
-      if (/ciao|bentornat/.test(back)) pass('audio round-trip preserved Italian');
-      else fail('audio round-trip', `Italian opener missing in: "${back.slice(0, 100)}"`);
+      // Only assert "Italian survives" when the GREETING actually contained
+      // Italian. For a low-ratio learner whose auto-ratio is ≤0.10, the
+      // greeting may correctly be pure English (within the model's budget)
+      // — in that case we just verify the pipeline produces readable audio.
+      const greetingHadItalian = /ciao|bentornat|perché|allora|cibo|grazie|prego|sì/.test(
+        greeting.data.greeting.toLowerCase(),
+      );
+      if (greetingHadItalian) {
+        if (/ciao|bentornat/.test(back)) pass('audio round-trip preserved Italian');
+        else fail('audio round-trip', `Italian opener missing in: "${back.slice(0, 100)}"`);
+      } else {
+        pass('audio round-trip — greeting was English-only (low-ratio learner)');
+      }
       // Round-trip should not be empty / catastrophically short.
       if (back.length >= 10) pass('audio round-trip readable');
       else fail('audio round-trip', `transcript too short (${back.length} chars)`);
@@ -1101,6 +1110,79 @@ async function main() {
         `no tutor/past-tense reference in: "${dirGreetRes.data.greeting}"`,
       );
     }
+  }
+
+  // ── 13. Fluency dashboard ─────────────────────────────────────────
+  // The new /api/dashboard endpoint is the data source for the rebuilt
+  // /progress page. Verify the composite payload includes all the
+  // pieces the dashboard renders: CEFR progress, weekly summary,
+  // 30-day activity, derived strengths/weaknesses, and "coming next".
+  log('\n13. FLUENCY DASHBOARD');
+  const dashRes = await api<{
+    learner: { name: string; currentLevel: string };
+    cefrProgress: {
+      current: string;
+      nextLevel: string | null;
+      percent: number;
+      masteredCount: number;
+      totalAtLevel: number;
+    };
+    weekly: {
+      daysPracticedThisWeek: number;
+      lessonsCompletedThisWeek: number;
+      currentStreak: number;
+      xpTotal: number;
+    };
+    activity30: Array<{ date: string; sessions: number; lessons: number }>;
+    strengths: unknown[];
+    workingOn: unknown[];
+    weaknesses: unknown[];
+    comingNext: Array<{ skillId: string; name: string; pinnedByTutor?: boolean }>;
+    vocabulary: { counts: Record<string, number>; dueCount: number };
+    recentLessons: Array<{ id: string; title: string }>;
+    tutorDirective: { body: string } | null;
+    isFresh: boolean;
+  }>('GET', '/api/dashboard', cookie);
+
+  if (dashRes.status !== 200) {
+    fail('GET /api/dashboard', `status ${dashRes.status}: ${dashRes.raw.slice(0, 200)}`);
+  } else {
+    pass('GET /api/dashboard', `status 200`);
+    const d = dashRes.data;
+    // Identity
+    if (d.cefrProgress.current === 'beginner') pass('cefr current matches profile');
+    else fail('cefr current', `got '${d.cefrProgress.current}', expected 'beginner'`);
+    // Weekly should reflect the lessons we ran in earlier phases
+    if (d.weekly.lessonsCompletedThisWeek >= 1)
+      pass('weekly.lessonsCompletedThisWeek', String(d.weekly.lessonsCompletedThisWeek));
+    else
+      fail(
+        'weekly.lessonsCompletedThisWeek',
+        `got ${d.weekly.lessonsCompletedThisWeek}; expected ≥ 1 after Phase 7`,
+      );
+    // 30-day activity has exactly 30 days
+    if (d.activity30.length === 30) pass('activity30 has 30 days');
+    else fail('activity30 length', String(d.activity30.length));
+    // Coming next should always have something (either from progress or empty-state fallback)
+    if (d.comingNext.length >= 3) pass('comingNext non-empty', String(d.comingNext.length));
+    else fail('comingNext too short', String(d.comingNext.length));
+    // After the tutor directive was issued in Phase 12, the dashboard's
+    // coming-next list should mark the pinned skill as pinnedByTutor.
+    const anyPinned = d.comingNext.some((s) => s.pinnedByTutor === true);
+    if (anyPinned) pass('tutor-pinned skill surfaces in comingNext');
+    else
+      fail(
+        'comingNext missing tutor pin',
+        'Phase 12 set a tutor directive; expected pinnedByTutor=true on at least one skill',
+      );
+    // Tutor directive passthrough
+    if (d.tutorDirective?.body)
+      pass('dashboard surfaces tutor directive body', d.tutorDirective.body.slice(0, 60) + '…');
+    else fail('dashboard tutor directive missing', 'expected directive after Phase 12');
+    // Recent lessons should include the lessons we ran
+    if (d.recentLessons.length >= 1)
+      pass('recentLessons populated', String(d.recentLessons.length));
+    else fail('recentLessons empty', '0');
   }
 
   await cleanup(prisma, tutorUser.id);

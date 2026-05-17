@@ -5,47 +5,19 @@ import { prisma } from '@speakwise/db';
 import Link from 'next/link';
 
 /**
- * Bilingual nav label. We render English-primary with Italian secondary
- * when the learner's languageRatio is low (≤0.30) so a beginner can
- * actually navigate the app. As they level up, the Italian word takes
- * the primary slot. At full immersion, only the Italian word shows.
- *
- * Trade-off: previously the nav was 100% Italian for every learner —
- * "Casa / Parla / Lezioni / …" — which is great for an intermediate
- * learner but a wall to a complete beginner who hasn't learned any
- * navigation vocabulary yet. This makes the app teachable from day one.
+ * Pick ONE language for a nav label based on the learner's ratio band.
+ * Previously we stacked EN over a tiny IT subtitle, which felt cluttered
+ * and didn't visually center well at small text sizes. A single word is
+ * cleaner and scales with the learner: English for beginners, Italian
+ * once they're comfortable.
+ *   ratio ≤ 0.50  →  English
+ *   ratio  > 0.50 →  Italian
+ *   immersion    →  Italian
  */
-function NavLabel({
-  en,
-  it,
-  ratio,
-  immersion,
-}: {
-  en: string;
-  it: string;
-  ratio: number;
-  immersion: boolean;
-}) {
-  // Full immersion → Italian only.
-  if (immersion) {
-    return <span>{it}</span>;
-  }
-  // Intermediate+ → Italian primary, English subtitle.
-  if (ratio > 0.5) {
-    return (
-      <span className="inline-flex flex-col leading-none">
-        <span>{it}</span>
-        <span className="text-[10px] text-ink-300 mt-0.5">{en}</span>
-      </span>
-    );
-  }
-  // Beginner / lower-intermediate → English primary, Italian subtitle.
-  return (
-    <span className="inline-flex flex-col leading-none">
-      <span>{en}</span>
-      <span className="text-[10px] text-ink-300 mt-0.5">{it}</span>
-    </span>
-  );
+function navLabel(en: string, it: string, ratio: number, immersion: boolean): string {
+  if (immersion) return it;
+  if (ratio > 0.5) return it;
+  return en;
 }
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -92,24 +64,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </Link>
           </nav>
         ) : (
-          <nav className="hidden md:flex gap-6 text-sm text-ink-200 items-center">
+          // Single-language nav by ratio band; cleaner than the stacked
+          // EN/IT we shipped before. /lessons and /vocabulary moved into
+          // the Progress dashboard so they're not separate top-level
+          // tabs anymore (still reachable via dashboard CTAs).
+          <nav className="hidden md:flex gap-8 text-[15px] text-ink-200 items-center">
             <Link href="/command-center" className="hover:text-ink-50 transition">
-              <NavLabel en="Home" it="Casa" ratio={ratio} immersion={immersion} />
+              {navLabel('Home', 'Casa', ratio, immersion)}
             </Link>
             <Link href="/talk" className="hover:text-ink-50 transition">
-              <NavLabel en="Talk" it="Parla" ratio={ratio} immersion={immersion} />
-            </Link>
-            <Link href="/lessons" className="hover:text-ink-50 transition">
-              <NavLabel en="Lessons" it="Lezioni" ratio={ratio} immersion={immersion} />
-            </Link>
-            <Link href="/vocabulary" className="hover:text-ink-50 transition">
-              <NavLabel en="Words" it="Parole" ratio={ratio} immersion={immersion} />
+              {navLabel('Talk', 'Parla', ratio, immersion)}
             </Link>
             <Link href="/progress" className="hover:text-ink-50 transition">
-              <NavLabel en="Progress" it="Progressi" ratio={ratio} immersion={immersion} />
+              {navLabel('Progress', 'Progressi', ratio, immersion)}
             </Link>
             <Link href="/profile" className="hover:text-ink-50 transition">
-              <NavLabel en="Profile" it="Profilo" ratio={ratio} immersion={immersion} />
+              {navLabel('Profile', 'Profilo', ratio, immersion)}
             </Link>
           </nav>
         )}
