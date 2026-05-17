@@ -2,6 +2,7 @@ import { Models, chatStructured } from '@speakwise/ai';
 import { type CEFRLevel, type LessonAuthor, type LessonType, prisma } from '@speakwise/db';
 import { emitUserEvent } from '@speakwise/events';
 import { LessonGenerationOutputSchema } from '@speakwise/schemas';
+import { getActiveDirectiveForStudent } from '../classroom';
 import { getActiveSkills, getSkillsBySlugs, getSkillsDueForReview } from '../curriculum';
 import { listMemory } from '../memory';
 import { getWiseProfileSummary } from '../profile';
@@ -14,15 +15,55 @@ export interface GenerateLessonInput {
   interestTheme?: string;
   userRequest?: string;
   createdBy?: LessonAuthor;
+  /**
+   * If passed, the generator will pull this specific directive instead
+   * of looking up the student's active one. Used by the harness/admin.
+   */
+  tutorDirectiveId?: string;
 }
 
 export async function generateLesson(input: GenerateLessonInput) {
   const profile = await getWiseProfileSummary(input.userId);
   if (!profile) throw new Error('Learner profile not found — onboarding required first.');
 
+  // Pull the student's active tutor directive (if any). When present
+  // AND the directive has pinned skills, those override the default
+  // "what's active or due" picker — the tutor's focus wins.
+  // An explicit `tutorDirectiveId` skips the lookup and uses that one
+  // (lets the harness or admin force a specific directive).
+  const directive = input.tutorDirectiveId
+    ? await prisma.tutorDirective
+        .findUnique({
+          where: { id: input.tutorDirectiveId },
+          include: { tutor: { select: { userId: true } } },
+        })
+        .then(async (d) =>
+          d
+            ? {
+                directiveId: d.id,
+                body: d.body,
+                pinnedSkillIds: d.pinnedSkillIds,
+                pinnedSkills:
+                  d.pinnedSkillIds.length > 0
+                    ? await prisma.curriculumSkill.findMany({
+                        where: { id: { in: d.pinnedSkillIds } },
+                        select: { id: true, slug: true, name: true },
+                      })
+                    : [],
+                expiresAt: d.expiresAt,
+              }
+            : null,
+        )
+    : await getActiveDirectiveForStudent(input.userId);
+
   let targetSkills = input.targetSkillIds
     ? await prisma.curriculumSkill.findMany({ where: { id: { in: input.targetSkillIds } } })
-    : (await getActiveSkills(input.userId)).slice(0, 5);
+    : directive && directive.pinnedSkillIds.length > 0
+      ? // Tutor-pinned skills take precedence over the default pick.
+        await prisma.curriculumSkill.findMany({
+          where: { id: { in: directive.pinnedSkillIds } },
+        })
+      : (await getActiveSkills(input.userId)).slice(0, 5);
 
   if (targetSkills.length === 0) {
     // First-ever lesson: pick any skill at the learner's level
@@ -73,6 +114,15 @@ export async function generateLesson(input: GenerateLessonInput) {
       type: m.type,
       content: m.content,
     })),
+    // Tutor directive — when present, the prompt is instructed to lead
+    // with the tutor's focus area and ensure pinned skills dominate the
+    // task mix. Null when no tutor or no active directive.
+    tutorDirective: directive
+      ? {
+          body: directive.body,
+          pinnedSkills: directive.pinnedSkills.map((s) => ({ slug: s.slug, name: s.name })),
+        }
+      : null,
   };
 
   const request = {
@@ -130,7 +180,11 @@ export async function generateLesson(input: GenerateLessonInput) {
         promptVersion: String(result.usage.promptVersion),
       },
       content: { briefing: ai.briefing, recapPlan: ai.recapPlan },
-      createdBy: input.createdBy ?? 'wise',
+      // Lessons that came from a tutor directive are attributed to the
+      // tutor, even though Wise actually generated the content. The
+      // tutorDirectiveId provides the audit link back to the directive.
+      createdBy: input.createdBy ?? (directive ? 'tutor' : 'wise'),
+      tutorDirectiveId: directive?.directiveId ?? null,
       tasks: {
         // biome-ignore lint/suspicious/noExplicitAny: Prisma's Json input type
         // is structurally narrower than what Zod-validated AI output produces;

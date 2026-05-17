@@ -5,6 +5,9 @@ import { redirect } from 'next/navigation';
 
 export default async function CommandCenterPage() {
   const user = await getOrCreateUser();
+  // Tutors don't have a learner experience — punt them to their classroom.
+  // Admin URL-bar typing on a learner page just routes to the right home.
+  if (user.role === 'tutor') redirect('/classroom');
   const profile = await ensureProfile(user.id);
   if (!profile.onboardingCompleted) redirect('/onboarding');
 

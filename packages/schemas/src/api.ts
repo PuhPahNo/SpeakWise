@@ -53,6 +53,45 @@ export const PatchProfileRequestSchema = z.object({
   immersionMode: z.boolean().optional(),
 });
 
+// ── Classroom / tutor APIs ────────────────────────────────────────────
+// Invite-code format: 8 chars, base32-style (no 0/1/O/I/L). Codes are
+// shown in uppercase but accepted case-insensitively at the route layer.
+export const InviteCodeSchema = z
+  .string()
+  .trim()
+  .min(6)
+  .max(12)
+  .regex(/^[A-Za-z0-9]+$/, 'invite codes are alphanumeric only');
+
+export const ConnectTutorRequestSchema = z.object({
+  code: InviteCodeSchema,
+});
+
+export const CreateTutorDirectiveRequestSchema = z.object({
+  studentId: z.string().uuid(),
+  body: z.string().trim().min(3).max(800),
+  /** Optional CurriculumSkill UUIDs to prioritize. Empty = directive is text-only. */
+  pinnedSkillIds: z.array(z.string().uuid()).max(20).optional(),
+  /** ISO date string. If null/omitted, the directive stays active until archived. */
+  expiresAt: z.string().datetime().nullable().optional(),
+  /** Whether to archive any other active directives for this student. Default true. */
+  replaceExisting: z.boolean().optional(),
+});
+
+export const PatchTutorDirectiveRequestSchema = z.object({
+  body: z.string().trim().min(3).max(800).optional(),
+  pinnedSkillIds: z.array(z.string().uuid()).max(20).optional(),
+  expiresAt: z.string().datetime().nullable().optional(),
+  /** Setting status to 'archived' is the common path. */
+  status: z.enum(['active', 'archived']).optional(),
+});
+
+export const PatchTutorProfileRequestSchema = z.object({
+  displayName: z.string().trim().min(1).max(80).optional(),
+  bio: z.string().trim().max(800).optional(),
+  specialties: z.array(z.string().trim().min(1).max(40)).max(10).optional(),
+});
+
 export const WiseMessageRequestSchema = z.object({
   mode: SessionModeEnum,
   message: z.string().min(1).max(8000),

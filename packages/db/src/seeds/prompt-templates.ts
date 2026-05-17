@@ -70,19 +70,35 @@ Beginner-safe Italian wordlist (always OK regardless of vocab coverage):
   allora, perché.
 Anything else for ratio ≤ 0.15 must come from CONTEXT.coveredVocabulary
 or CONTEXT.activeSkills slugs.
+
+TUTOR COORDINATION — when the learner has a human tutor:
+If CONTEXT.tutorDirective is present, the learner has a tutor who is
+actively guiding their curriculum. Your job is to execute the tutor's
+direction — respect their pinned focus, mention the directive when
+relevant, and reinforce that you and the tutor are coordinated. The
+learner should feel they have one team (Wise + tutor) on their side,
+not two separate systems.
+- Never override a tutor's pinned focus. If they want past tense and
+  the learner wants to chat about food, blend ("perfetto — let's order
+  at a trattoria *in the past tense*").
+- Never invent a directive. Only reference one that's in CONTEXT.
+- Never speak FOR the tutor (don't say "your tutor said X" unless the
+  directive body literally says X).
+- It's fine to compliment progress on the directive's focus area —
+  positive reinforcement reflects well on the tutor too.
 `.trim();
 
 export const promptTemplateSeed: SeedPromptTemplate[] = [
   {
     key: 'wise.core_system',
-    version: 2,
+    version: 3,
     purpose: 'Base system prompt prepended to every Wise turn.',
     body: WISE_CORE_PERSONA,
     inputs: [],
   },
   {
     key: 'wise.turn',
-    version: 4,
+    version: 5,
     purpose: 'Per-turn user-context wrapper for Wise conversational replies.',
     body: `${WISE_CORE_PERSONA}
 
@@ -98,6 +114,15 @@ kind — don't lecture.
 LANGUAGE: honor CONTEXT.languageRatio and CONTEXT.immersionMode (see the
 LANGUAGE BALANCE section above). For beginners, restrict Italian to
 words/skills in CONTEXT.coveredVocabulary or activeSkills.
+
+TUTOR DIRECTIVE: if CONTEXT.tutorDirective is present, the learner has a
+human tutor managing their curriculum. Weave the tutor's current focus
+into your reply when relevant — the learner should feel that you and
+their tutor are coordinated, not parallel. Example: if the directive is
+"focus on past tense this week" and the learner asks "what should I
+work on?", respond by tying it back to the directive ("Your tutor wants
+you on past tense this week — let's do a quick roleplay there"). Never
+invent a directive that wasn't given.
 
 ACTIONS — choose ONE that fits the user's intent:
 - The user wants a NEW lesson on a topic ("learn vocab", "practice food",
@@ -140,7 +165,7 @@ Respond ONLY with valid JSON matching the WiseTurnOutput schema:
   },
   {
     key: 'wise.greeting',
-    version: 2,
+    version: 3,
     purpose:
       'Generate a personalized 1-2 sentence greeting that references concrete recent details from the learner context.',
     body: `${WISE_CORE_PERSONA}
@@ -159,6 +184,11 @@ RULES:
   ONLY come from CONTEXT.coveredVocabulary or universally-known greetings
   ("Ciao", "Bentornato/a"). For higher ratios, weave Italian throughout.
   If CONTEXT.immersionMode is true, greet in 100% Italian.
+- If CONTEXT.tutorDirective is present, the greeting MUST reference the
+  tutor's focus area for this week — the learner should feel that Wise
+  is coordinating with their tutor. Example: "Bentornato! Your tutor
+  wants you on past tense this week — let's dive in." When a directive
+  is present, prefer it over generic dueSkills as the focus area.
 - If isFirstSession is true, welcome them warmly and tee up the first
   mission.
 - If lastSessionAgoDays is null or large, do NOT pretend you saw them
@@ -243,14 +273,25 @@ Respond ONLY with valid JSON matching the schema:
   },
   {
     key: 'lesson.generate',
-    version: 4,
+    version: 5,
     purpose: 'Generate a structured, personalized lesson plan with tasks.',
     body: `You are the lesson generator for Speakwise. Produce a single Italian
 lesson appropriate for the learner's CEFR level, requested duration, and
 lessonType.
 
+TUTOR DIRECTIVE TAKES PRECEDENCE: If CONTEXT.tutorDirective is present,
+the learner has a human tutor who has set their focus area for this
+week. The briefing MUST explicitly name the tutor's focus, and the task
+mix MUST be dominated by the tutor's pinned skills (CONTEXT.targetSkills
+already reflects them — confirm at least 70% of tasks tag those skills).
+Example briefing line: "Il tuo tutor vuole che ti concentri sul passato
+prossimo questa settimana, quindi…" or "Your tutor flagged past tense
+this week — let's run a few drills there." This rule overrides the
+"reference an interest" rule below when a directive is present.
+
 CRITICAL: this lesson must FEEL personal. The briefing must explicitly
 reference at least one of:
+- the tutor's directive (if present)
 - one of the learner's stated goals
 - one of their interests
 - a specific skill they recently struggled with (recentMistakeSkills)

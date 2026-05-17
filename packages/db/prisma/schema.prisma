@@ -242,6 +242,9 @@ model User {
   lastActiveAt    DateTime? @map("last_active_at")
 
   profile          LearnerProfile?
+  tutorProfile     TutorProfile?
+  studentLinks     TutorStudent[]    @relation("StudentTutorLinks")
+  directivesReceived TutorDirective[] @relation("StudentDirectives")
   skillProgress    UserSkillProgress[]
   vocabularyItems  VocabularyItem[]
   lessons          Lesson[]
@@ -379,16 +382,22 @@ model Lesson {
   generationContext        Json         @default("{}") @map("generation_context")
   content                  Json         @default("{}")
   createdBy                LessonAuthor @default(wise) @map("created_by")
+  /// Set when the lesson was generated under a tutor's active directive,
+  /// so we can audit "which directive drove which lesson" and surface it
+  /// in the tutor's view.
+  tutorDirectiveId         String?      @map("tutor_directive_id") @db.Uuid
   createdAt                DateTime     @default(now()) @map("created_at")
   updatedAt                DateTime     @updatedAt @map("updated_at")
   completedAt              DateTime?    @map("completed_at")
 
-  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tasks    LessonTask[]
-  sessions Session[]
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tutorDirective  TutorDirective?  @relation("LessonFromDirective", fields: [tutorDirectiveId], references: [id])
+  tasks           LessonTask[]
+  sessions        Session[]
 
   @@index([userId, status])
   @@index([userId, lessonType])
+  @@index([tutorDirectiveId])
   @@map("lessons")
 }
 
@@ -591,4 +600,84 @@ model FeatureFlag {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("feature_flags")
+}
+
+// ── Tutor / Classroom ────────────────────────────────────────────────────
+//
+// A `TutorProfile` is the tutor-side counterpart of `LearnerProfile`.
+// Admin-provisioned (no self-service signup); the CLI in
+// `scripts/create-user.ts` creates the row alongside the User. Each
+// tutor has a single rotatable `inviteCode` — students enter it to
+// link their account to the tutor via `TutorStudent`.
+
+model TutorProfile {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @unique @map("user_id") @db.Uuid
+  displayName String?  @map("display_name")
+  bio         String?  @db.Text
+  /// Languages the tutor specializes in (e.g. ["it"]). Multi-language ready.
+  specialties String[] @default([])
+  /// Random 8-char invite code; students enter it to link. Rotatable.
+  inviteCode  String   @unique @map("invite_code")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  students   TutorStudent[]
+  directives TutorDirective[]
+
+  @@map("tutor_profiles")
+}
+
+model TutorStudent {
+  id          String              @id @default(uuid()) @db.Uuid
+  tutorId     String              @map("tutor_id") @db.Uuid
+  studentId   String              @map("student_id") @db.Uuid
+  status      TutorStudentStatus  @default(active)
+  connectedAt DateTime            @default(now()) @map("connected_at")
+  endedAt     DateTime?           @map("ended_at")
+
+  tutor   TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  student User         @relation("StudentTutorLinks", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([tutorId, studentId])
+  @@index([studentId, status])
+  @@map("tutor_students")
+}
+
+enum TutorStudentStatus {
+  active
+  paused
+  ended
+}
+
+/// A directive is the tutor's standing instruction to Wise: a free-text
+/// focus area + an optional list of CurriculumSkill IDs to prioritize.
+/// Lesson generation reads the latest `active` directive for the student
+/// and uses it to override `targetSkillIds` + flavor the briefing.
+model TutorDirective {
+  id              String          @id @default(uuid()) @db.Uuid
+  tutorId         String          @map("tutor_id") @db.Uuid
+  studentId       String          @map("student_id") @db.Uuid
+  /// Free-text guidance Wise can read ("focus on past tense this week").
+  body            String          @db.Text
+  /// CurriculumSkill UUIDs the tutor wants prioritized in upcoming lessons.
+  pinnedSkillIds  String[]        @default([]) @map("pinned_skill_ids") @db.Uuid
+  status          DirectiveStatus @default(active)
+  /// Optional auto-archive date — if null, stays active until archived.
+  expiresAt       DateTime?       @map("expires_at")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  tutor   TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  student User         @relation("StudentDirectives", fields: [studentId], references: [id], onDelete: Cascade)
+  lessons Lesson[]     @relation("LessonFromDirective")
+
+  @@index([studentId, status])
+  @@map("tutor_directives")
+}
+
+enum DirectiveStatus {
+  active
+  archived
 }

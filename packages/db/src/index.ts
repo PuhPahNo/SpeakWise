@@ -39,4 +39,6 @@ export {
   MemoryVisibility,
   MediaSourceType,
   RightsStatus,
+  TutorStudentStatus,
+  DirectiveStatus,
 } from '@prisma/client';

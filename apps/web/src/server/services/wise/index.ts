@@ -3,18 +3,20 @@ import { prisma } from '@speakwise/db';
 import { emitUserEvent } from '@speakwise/events';
 import { type WiseMessageRequest, WiseTurnOutputSchema } from '@speakwise/schemas';
 import { z } from 'zod';
+import { getActiveDirectiveForStudent } from '../classroom';
 import { getActiveSkills, getSkillsDueForReview } from '../curriculum';
 import { applyMemoryCandidates, listMemory, retrieveRelevantMemories } from '../memory';
 import { getWiseProfileSummary } from '../profile';
 import { listVocabulary } from '../vocabulary';
 
 export async function wiseTurn(userId: string, req: WiseMessageRequest) {
-  const [profile, activeSkills, dueSkills, dueVocab, memories] = await Promise.all([
+  const [profile, activeSkills, dueSkills, dueVocab, memories, directive] = await Promise.all([
     getWiseProfileSummary(userId),
     getActiveSkills(userId),
     getSkillsDueForReview(userId, 3),
     listVocabulary(userId, { dueForReview: true }),
     retrieveRelevantMemories(userId, req.message, 5),
+    getActiveDirectiveForStudent(userId),
   ]);
 
   const recentSessions = await prisma.session.findMany({
@@ -46,6 +48,14 @@ export async function wiseTurn(userId: string, req: WiseMessageRequest) {
     relevantMemories: memories.map((m) => ({ type: m.type, content: m.content })),
     currentScreen: req.context?.screen ?? null,
     currentLessonId: req.context?.lessonId ?? null,
+    // Tutor's active directive. Wise weaves the focus into the turn when
+    // relevant — the learner feels Wise and their tutor are coordinated.
+    tutorDirective: directive
+      ? {
+          body: directive.body,
+          pinnedSkills: directive.pinnedSkills.map((s) => ({ slug: s.slug, name: s.name })),
+        }
+      : null,
   };
 
   const result = await chatStructured({
@@ -112,6 +122,7 @@ export async function generateGreeting(userId: string): Promise<GreetingResult> 
     streak,
     recentMistakes,
     visibleMemories,
+    directive,
   ] = await Promise.all([
     prisma.user.findUniqueOrThrow({ where: { id: userId } }),
     getWiseProfileSummary(userId),
@@ -138,6 +149,7 @@ export async function generateGreeting(userId: string): Promise<GreetingResult> 
       select: { skillIds: true, createdAt: true },
     }),
     listMemory(userId, { visibility: 'user_visible' }),
+    getActiveDirectiveForStudent(userId),
   ]);
 
   const lastCompleted = recentSessions[0]?.completedAt ?? null;
@@ -186,6 +198,14 @@ export async function generateGreeting(userId: string): Promise<GreetingResult> 
     recentMistakeSkillNames,
     recentVisibleMemories: visibleMemories.slice(0, 3).map((m) => m.content),
     isFirstSession: recentSessions.length === 0,
+    // Tutor's current focus area. If present, the greeting should mention
+    // it ("your tutor wants you on past tense this week, andiamo!").
+    tutorDirective: directive
+      ? {
+          body: directive.body,
+          pinnedSkills: directive.pinnedSkills.map((s) => ({ slug: s.slug, name: s.name })),
+        }
+      : null,
   };
 
   const result = await chatStructured({

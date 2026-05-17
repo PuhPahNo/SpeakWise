@@ -885,6 +885,188 @@ async function main() {
   }
 
   await cleanup(prisma, interUser.id);
+
+  // ── 12. Tutor + Student end-to-end ────────────────────────────────
+  // Provision a tutor, link the original learner, write a directive
+  // pinning a known past-tense skill, generate a lesson, and assert
+  // the directive flows through to the lesson's target skills + briefing.
+  log('\n12. TUTOR + STUDENT END-TO-END');
+
+  // Find a past-tense / passato prossimo skill to pin
+  const pastTenseSkill = await prisma.curriculumSkill.findFirst({
+    where: {
+      OR: [
+        { slug: { contains: 'passato' } },
+        { slug: { contains: 'past' } },
+        { name: { contains: 'past', mode: 'insensitive' } },
+        { name: { contains: 'passato', mode: 'insensitive' } },
+      ],
+    },
+  });
+  if (!pastTenseSkill) {
+    fail('past-tense skill seed', 'no past-tense skill in curriculum');
+  } else {
+    pass('past-tense skill resolved', `${pastTenseSkill.slug} (${pastTenseSkill.name})`);
+  }
+
+  // Provision the tutor directly via Prisma (mirrors the admin CLI)
+  const tutorUsername = `qa-tutor-${randomBytes(3).toString('hex')}`;
+  const tutorUser = await prisma.user.create({
+    data: {
+      username: tutorUsername,
+      passwordHash: await bcrypt.hash(password, 12),
+      name: `QA Tutor`,
+      role: 'tutor',
+      nativeLanguage: 'en',
+      targetLanguage: 'it',
+    },
+  });
+  const tutorProfile = await prisma.tutorProfile.create({
+    data: {
+      userId: tutorUser.id,
+      displayName: 'Maestra QA',
+      inviteCode: `QATEST${randomBytes(1).toString('hex').toUpperCase()}`,
+    },
+  });
+  pass('tutor provisioned', `code=${tutorProfile.inviteCode}`);
+
+  // Tutor signs in, fetches /me, gets invite code
+  const tutorSignin = await fetch(`${BASE}/api/auth/signin`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: tutorUsername, password }),
+  });
+  const tutorCookie = `sw_session=${
+    tutorSignin.headers.get('set-cookie')?.match(/sw_session=([^;]+)/)?.[1] ?? ''
+  }`;
+  const meRes = await api<{ inviteCode: string; displayName: string | null }>(
+    'GET',
+    '/api/classroom/me',
+    tutorCookie,
+  );
+  if (meRes.status === 200 && meRes.data.inviteCode === tutorProfile.inviteCode) {
+    pass('GET /api/classroom/me', `code=${meRes.data.inviteCode}`);
+  } else {
+    fail('GET /api/classroom/me', `status ${meRes.status}: ${meRes.raw.slice(0, 200)}`);
+  }
+
+  // Original learner connects via the code
+  const connectRes = await api<{ connected: boolean; tutorName?: string }>(
+    'POST',
+    '/api/profile/tutor',
+    cookie,
+    { code: tutorProfile.inviteCode },
+  );
+  if (connectRes.status === 200 && connectRes.data.connected) {
+    pass('student linked', `to ${connectRes.data.tutorName}`);
+  } else {
+    fail(
+      'POST /api/profile/tutor',
+      `status ${connectRes.status}: ${connectRes.raw.slice(0, 200)}`,
+    );
+  }
+
+  // Verify the link exists in DB
+  const link = await prisma.tutorStudent.findUnique({
+    where: { tutorId_studentId: { tutorId: tutorProfile.id, studentId: user.id } },
+  });
+  if (link?.status === 'active') pass('TutorStudent row created');
+  else fail('TutorStudent row', `status ${link?.status ?? 'missing'}`);
+
+  // Tutor sees student in their list
+  const studentsRes = await api<{ students: Array<{ studentId: string; name: string }> }>(
+    'GET',
+    '/api/classroom/students',
+    tutorCookie,
+  );
+  if (studentsRes.status === 200 && studentsRes.data.students.some((s) => s.studentId === user.id)) {
+    pass('GET /api/classroom/students includes the new link');
+  } else {
+    fail(
+      'GET /api/classroom/students',
+      `status ${studentsRes.status}: ${studentsRes.raw.slice(0, 200)}`,
+    );
+  }
+
+  // Tutor creates a directive
+  const directiveBody = 'Focus on past tense verbs this week. Lots of passato prossimo drills.';
+  const dirRes = await api<{ directive: { id: string; body: string; pinnedSkillIds: string[] } }>(
+    'POST',
+    '/api/classroom/directives',
+    tutorCookie,
+    {
+      studentId: user.id,
+      body: directiveBody,
+      pinnedSkillIds: pastTenseSkill ? [pastTenseSkill.id] : [],
+    },
+  );
+  if (dirRes.status !== 200 || !dirRes.data.directive?.id) {
+    fail('POST /api/classroom/directives', `status ${dirRes.status}: ${dirRes.raw.slice(0, 200)}`);
+  } else {
+    pass('directive created', dirRes.data.directive.id.slice(0, 8) + '…');
+  }
+
+  // Student generates a new lesson — should be driven by the directive
+  const dirLessonRes = await api<{ lesson: { id: string; tutorDirectiveId: string | null } }>(
+    'POST',
+    '/api/lessons/generate',
+    cookie,
+    { lessonType: 'daily_mission' },
+  );
+  if (dirLessonRes.status !== 200) {
+    fail('directive lesson generate', `status ${dirLessonRes.status}: ${dirLessonRes.raw.slice(0, 200)}`);
+  } else {
+    pass('lesson generated under directive', dirLessonRes.data.lesson.id.slice(0, 8) + '…');
+    const dbLesson = await prisma.lesson.findUnique({
+      where: { id: dirLessonRes.data.lesson.id },
+      include: { tasks: true },
+    });
+    if (dbLesson?.tutorDirectiveId === dirRes.data.directive?.id) {
+      pass('lesson.tutorDirectiveId matches');
+    } else {
+      fail(
+        'lesson.tutorDirectiveId',
+        `expected ${dirRes.data.directive?.id} got ${dbLesson?.tutorDirectiveId}`,
+      );
+    }
+    if (dbLesson?.createdBy === 'tutor') {
+      pass('lesson.createdBy = tutor');
+    } else {
+      fail('lesson.createdBy', `expected 'tutor' got '${dbLesson?.createdBy}'`);
+    }
+    if (pastTenseSkill && dbLesson?.targetSkillIds.includes(pastTenseSkill.id)) {
+      pass('lesson targets the pinned skill');
+    } else {
+      fail(
+        'lesson targetSkillIds',
+        `pinned ${pastTenseSkill?.id} not in [${dbLesson?.targetSkillIds.join(', ')}]`,
+      );
+    }
+    const briefing = (dbLesson?.content as Record<string, unknown> | null)?.briefing as
+      | string
+      | undefined;
+    if (briefing && /tutor|past tense|passato|past-tense/i.test(briefing)) {
+      pass('lesson briefing references the directive', briefing.slice(0, 80) + '…');
+    } else {
+      fail('directive briefing', `no tutor/past-tense reference in: "${briefing?.slice(0, 100)}"`);
+    }
+  }
+
+  // Greeting should also mention the directive
+  const dirGreetRes = await api<{ greeting: string }>('GET', '/api/wise/greeting', cookie);
+  if (dirGreetRes.status === 200) {
+    log(`    directive greeting: "${dirGreetRes.data.greeting}"`);
+    if (/tutor|past tense|passato/i.test(dirGreetRes.data.greeting)) {
+      pass('greeting references the directive');
+    } else {
+      fail(
+        'directive greeting',
+        `no tutor/past-tense reference in: "${dirGreetRes.data.greeting}"`,
+      );
+    }
+  }
+
+  await cleanup(prisma, tutorUser.id);
   await cleanup(prisma, user.id);
   await prisma.$disconnect();
   await summarize();
@@ -893,7 +1075,19 @@ async function main() {
 async function cleanup(prisma: PrismaClient, userId: string) {
   // Best-effort delete of test user + cascading rows. Don't disconnect
   // here — the harness reuses the prisma client across multiple users.
+  // Most tables cascade on `User` delete (FKs are onDelete: Cascade), so
+  // strictly only `user.delete()` is required — the deleteMany calls
+  // below are belt-and-suspenders for tables that pre-date cascades.
   try {
+    // Tutor-side rows first (a tutor user may have linked students;
+    // those rows cascade off the tutor profile).
+    await prisma.tutorDirective.deleteMany({
+      where: { OR: [{ studentId: userId }, { tutor: { userId } }] },
+    });
+    await prisma.tutorStudent.deleteMany({
+      where: { OR: [{ studentId: userId }, { tutor: { userId } }] },
+    });
+    await prisma.tutorProfile.deleteMany({ where: { userId } });
     await prisma.userResponse.deleteMany({ where: { session: { userId } } });
     await prisma.session.deleteMany({ where: { userId } });
     await prisma.lessonTask.deleteMany({ where: { lesson: { userId } } });

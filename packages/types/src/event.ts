@@ -27,6 +27,13 @@ export const USER_EVENT_TYPES = [
   'UserMissedPlannedSession',
   'ComebackLessonOffered',
   'AICall',
+  // Tutor / Classroom audit events. Student-scoped (the userId is the
+  // student) so the existing per-user event timeline shows tutor activity
+  // alongside the learner's own actions.
+  'TutorLinked',
+  'TutorUnlinked',
+  'TutorDirectiveIssued',
+  'TutorDirectiveArchived',
 ] as const;
 export type UserEventType = (typeof USER_EVENT_TYPES)[number];
 
@@ -149,4 +156,13 @@ export interface UserEventPayloadMap {
   UserMissedPlannedSession: { plannedAt: ISODateTime };
   ComebackLessonOffered: ComebackLessonOfferedPayload;
   AICall: AICallPayload;
+  TutorLinked: { tutorUserId: UUID; tutorName: string };
+  TutorUnlinked: { tutorUserId: UUID | null };
+  TutorDirectiveIssued: {
+    directiveId: UUID;
+    tutorUserId: UUID;
+    body: string;
+    pinnedSkillIds: UUID[];
+  };
+  TutorDirectiveArchived: { directiveId: UUID; tutorUserId: UUID };
 }
