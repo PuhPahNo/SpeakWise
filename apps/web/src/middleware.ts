@@ -16,6 +16,12 @@ function isPublic(pathname: string): boolean {
   // Static assets and Next internals
   if (pathname.startsWith('/_next/')) return true;
   if (pathname.startsWith('/favicon')) return true;
+  // Favicon + Apple touch icon routes — Next.js serves these from
+  // app/icon.svg and app/apple-icon.tsx as `/icon.svg`, `/apple-icon`,
+  // and `/icon` (hashed variants too). They must be reachable without
+  // a session or the browser tab never gets its little orb.
+  if (pathname === '/icon.svg' || pathname.startsWith('/icon')) return true;
+  if (pathname.startsWith('/apple-icon')) return true;
   return false;
 }
 
