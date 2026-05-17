@@ -450,6 +450,21 @@ async function main() {
   }
   pass('first lesson generated', `id=${firstLesson.id.slice(0, 8)}… title="${firstLesson.title}"`);
 
+  // Beginner-title check: the test learner picked "sprinkle a little
+  // Italian" so the title should be mostly English. We fail if it
+  // overshoots — that catches regressions like the user's reported
+  // "Il vocabolario del cibo al ristorante" title for a beginner.
+  const titleStats = countItalianRatio(firstLesson.title);
+  log(`    title italian-ratio: ${(titleStats.ratio * 100).toFixed(0)}% (${titleStats.it}/${titleStats.total})`);
+  if (titleStats.ratio <= 0.5) {
+    pass('beginner title respects ratio');
+  } else {
+    fail(
+      'beginner title overshoot',
+      `${(titleStats.ratio * 100).toFixed(0)}% Italian in "${firstLesson.title}" — should be ≤ 50%`,
+    );
+  }
+
   // What did the onboarding extractor set the languageRatio to?
   const profileRow = await prisma.learnerProfile.findUnique({ where: { userId: user.id } });
   log(
@@ -508,6 +523,8 @@ async function main() {
         );
     }
     let badTasks = 0;
+    let listeningWithScript = 0;
+    let listeningTotal = 0;
     for (const t of dbLesson.tasks) {
       if (!t.prompt || t.prompt.length < 5) badTasks++;
       if (t.taskType === 'multiple_choice') {
@@ -515,9 +532,29 @@ async function main() {
         if (!opts || opts.length < 2) badTasks++;
         if (!t.expectedAnswer) badTasks++;
       }
+      if (t.taskType === 'listening_comprehension') {
+        listeningTotal++;
+        const meta = t.metadata as { script?: unknown } | null;
+        const s = meta?.script;
+        if (Array.isArray(s) && s.length >= 2) listeningWithScript++;
+      }
     }
     if (badTasks > 0) fail('task quality', `${badTasks} malformed task(s)`);
     else pass('all tasks well-formed');
+    // Listening tasks should have a 2+ line script for two-voice playback.
+    // Lessons without any listening task are also fine (not all are
+    // dialogue-heavy) — only fail if a listening task was generated
+    // without a script.
+    if (listeningTotal > 0) {
+      if (listeningWithScript === listeningTotal) {
+        pass('listening tasks have scripts', `${listeningWithScript}/${listeningTotal}`);
+      } else {
+        fail(
+          'listening tasks missing script',
+          `${listeningWithScript}/${listeningTotal} have a script`,
+        );
+      }
+    }
   }
 
   // ── 7. Walk the lesson — start, respond to each task, complete ──

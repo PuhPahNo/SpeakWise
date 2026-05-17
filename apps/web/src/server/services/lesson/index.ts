@@ -199,7 +199,14 @@ export async function generateLesson(input: GenerateLessonInput) {
           vocabularyItemIds: [],
           expectedAnswer: t.expectedAnswer ?? null,
           options: t.options ?? null,
-          metadata: { explanation: t.explanation, vocabularyTargets: t.vocabularyTargets },
+          metadata: {
+            explanation: t.explanation,
+            vocabularyTargets: t.vocabularyTargets,
+            // Multi-turn dialogue script for listening_comprehension tasks
+            // (undefined for everything else). The lesson player reads
+            // this and plays each line with a different voice.
+            script: t.script ?? undefined,
+          },
         })),
       },
     },

@@ -20,6 +20,46 @@ type Task = {
   orderIndex: number;
 };
 
+interface ScriptLine {
+  speaker: 'A' | 'B';
+  text: string;
+}
+
+// Two ElevenLabs premade voices that handle Italian phonetics well.
+// A = Bill (mature, balanced — the default Wise voice); B = Alice (clear,
+// engaging — a clear gender/timbre contrast so the learner can tell the
+// two speakers apart in a roleplay).
+const SCRIPT_VOICES: Record<'A' | 'B', string> = {
+  A: 'pqHfZKP75CvOlQylNhV4',
+  B: 'Xb7hH8MSUJpSbSDYk0k2',
+};
+
+/** Extracts the multi-turn script from a task's metadata, or null. */
+function getScript(task: Task | undefined): ScriptLine[] | null {
+  if (!task || task.taskType !== 'listening_comprehension') return null;
+  const meta = task.metadata as { script?: unknown } | null;
+  const raw = meta?.script;
+  if (!Array.isArray(raw)) return null;
+  const parsed: ScriptLine[] = [];
+  for (const item of raw) {
+    if (
+      typeof item === 'object' &&
+      item !== null &&
+      'speaker' in item &&
+      'text' in item &&
+      ((item as { speaker: unknown }).speaker === 'A' ||
+        (item as { speaker: unknown }).speaker === 'B') &&
+      typeof (item as { text: unknown }).text === 'string'
+    ) {
+      parsed.push({
+        speaker: (item as { speaker: 'A' | 'B' }).speaker,
+        text: (item as { text: string }).text,
+      });
+    }
+  }
+  return parsed.length > 0 ? parsed : null;
+}
+
 type Lesson = {
   id: string;
   content: unknown;
@@ -84,11 +124,17 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
   const opts = (currentTask?.options ?? null) as Array<{ value: string; label: string }> | null;
 
   // ── Session start + briefing narration ───────────────────────────────
+  // Called from the "Begin lesson" button click — a real user gesture.
+  // We MUST unlock the audio context inside this gesture (`primeAudio`)
+  // before any speak() call resolves; otherwise Chrome's autoplay policy
+  // silently rejects the play() and the user sees text with no audio.
   async function startSession() {
     if (briefedRef.current) return;
     briefedRef.current = true;
     setPending(true);
     try {
+      // Prime audio FIRST, synchronously inside the click handler.
+      await tutor.primeAudio();
       const res = await fetch(`/api/lessons/${lesson.id}/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -113,12 +159,66 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
     setPhase('task');
     const t = tasks[idx];
     if (!t) return;
+    // listening_comprehension is special: instead of Wise narrating the
+    // English question, we play the multi-turn Italian script first
+    // (two voices), THEN Wise asks the comprehension question. Falls
+    // back to "narrate the prompt" if no script was generated.
+    if (t.taskType === 'listening_comprehension') {
+      const script = getScript(t);
+      if (script) {
+        await playScript(script);
+        await tutor.speak(t.prompt, { autoListenAfter: false });
+        return;
+      }
+    }
     // Wise narrates the prompt out loud. For multiple-choice + fill_blank we
     // do NOT auto-listen (user clicks an option or types). For speaking
     // tasks we auto-listen so the user can just answer.
     const isVoiceAnswerTask =
       t.taskType === 'speaking_prompt' || t.taskType === 'translation' || t.taskType === 'roleplay';
     await tutor.speak(t.prompt, { autoListenAfter: isVoiceAnswerTask });
+  }
+
+  /**
+   * Play a multi-turn Italian script with alternating voices. Each line
+   * is synthesized via /api/voice/speak with a specific voiceId so the
+   * learner hears an actual dialogue between two people, not a single
+   * narrator role-playing.
+   */
+  async function playScript(script: ScriptLine[]) {
+    for (const line of script) {
+      const voiceId = SCRIPT_VOICES[line.speaker];
+      try {
+        const r = await fetch('/api/voice/speak', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: line.text, language: 'it', voiceId }),
+        });
+        if (!r.ok) throw new Error(`tts failed ${r.status}`);
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        await new Promise<void>((resolve) => {
+          audio.onended = () => {
+            URL.revokeObjectURL(url);
+            resolve();
+          };
+          audio.onerror = () => {
+            URL.revokeObjectURL(url);
+            resolve();
+          };
+          audio.play().catch(() => {
+            URL.revokeObjectURL(url);
+            resolve();
+          });
+        });
+        // Brief pause between turns so the conversation feels natural
+        // and the learner can mentally segment the speakers.
+        await new Promise((r) => setTimeout(r, 250));
+      } catch (e) {
+        console.error('script line playback failed', e);
+      }
+    }
   }
 
   async function submit(answerText?: string) {
@@ -344,16 +444,26 @@ export function LessonPlayer({ lesson, tasks }: { lesson: Lesson; tasks: Task[] 
             </p>
           ) : currentTask?.taskType === 'listening_comprehension' ? (
             <div className="space-y-3">
+              {/* The comprehension QUESTION is the prompt — render it so
+                  the learner can read it after they've heard the audio.
+                  The dialogue itself plays automatically at task start
+                  (see beginTask + playScript above) and can be replayed
+                  with the button below. */}
               <p className="font-display text-xl sm:text-2xl text-ink-50 leading-snug">
-                Listen, then answer.
+                {currentTask.prompt}
               </p>
-              <button
-                type="button"
-                onClick={() => void tutor.speak(currentTask.prompt, { autoListenAfter: false })}
-                className="inline-flex items-center gap-2 rounded-full surface px-5 py-2 text-sm text-ink-50 hover:border-wise-500/40"
-              >
-                ▶ Hear it again
-              </button>
+              {getScript(currentTask) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const s = getScript(currentTask);
+                    if (s) void playScript(s);
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full surface px-5 py-2 text-sm text-ink-50 hover:border-wise-500/40"
+                >
+                  ▶ Replay the conversation
+                </button>
+              )}
             </div>
           ) : (
             <p className="font-display text-xl sm:text-2xl text-ink-50 leading-snug">

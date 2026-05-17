@@ -273,7 +273,7 @@ Respond ONLY with valid JSON matching the schema:
   },
   {
     key: 'lesson.generate',
-    version: 5,
+    version: 6,
     purpose: 'Generate a structured, personalized lesson plan with tasks.',
     body: `You are the lesson generator for Speakwise. Produce a single Italian
 lesson appropriate for the learner's CEFR level, requested duration, and
@@ -303,6 +303,20 @@ mistake on "passato prossimo participle agreement":
 "Since you've been ordering at trattorias in your head, let's roleplay
 that — and we'll sneak in some past-tense practice where the participle
 likes to trip you up."
+
+LESSON TITLE LANGUAGE — the title is the BIGGEST text on the lesson
+page, so it sets the learner's emotional tone. It MUST follow the
+language ratio strictly:
+- ratio 0.00–0.15  →  Title is ENGLISH. Optionally include 1 Italian
+                     word the learner knows ("Restaurant ordering — at
+                     the trattoria"). Never a fully-Italian title for
+                     a complete beginner — it's intimidating and the
+                     learner can't read it yet.
+- ratio 0.15–0.50  →  Title is English with a familiar Italian phrase
+                     allowed ("Ordering food in Italian — al ristorante").
+- ratio 0.50–0.80  →  Title can be Italian-led with English in parens
+                     ("Ordinare al ristorante (restaurant ordering)").
+- ratio 0.80–1.00  →  Italian-only title.
 
 LANGUAGE BLEND OF THE BRIEFING:
 The briefing is spoken aloud by Wise. Match the learner's languageRatio
@@ -335,8 +349,19 @@ TASK PROMPTS — bilingual rules per taskType:
   should set the scene in the appropriate ratio (mostly English at
   beginner, mostly Italian at intermediate+) but always ASK FOR Italian
   output. Set expectedAnswer to a natural Italian sample.
-- listening_comprehension: the prompt should be the Italian audio text
-  the learner needs to comprehend. Always Italian.
+- listening_comprehension: MUST include a "script" field — a 4-8 line
+  Italian dialogue between two speakers (A and B). The lesson player
+  synthesizes each line with a different voice so the learner hears an
+  actual conversation. Each script line: { "speaker": "A" or "B",
+  "text": "Italian utterance" }. The "prompt" field then asks a
+  comprehension question about what was said (e.g., "What did the
+  customer order?"). Example:
+    "script": [
+      { "speaker": "A", "text": "Buongiorno, vorrei un caffè e un cornetto, per favore." },
+      { "speaker": "B", "text": "Certo, signora. Per qui o da portare via?" },
+      { "speaker": "A", "text": "Per qui, grazie." }
+    ],
+    "prompt": "What did the customer order, and is she staying or going?"
 - multiple_choice / fill_blank: stem can be in English explaining the
   scenario, but the answer choices should always be Italian phrases
   (since we're testing Italian production/recognition).
@@ -386,12 +411,15 @@ field names. Do NOT rename "title" to "lessonName" or "tasks" to
         translation, conjugation, pronoun_replacement, tense_selection,
         error_correction, speaking_prompt, listening_comprehension,
         roleplay, recap, media_clip, reflection],
-      "prompt": "string (1+ chars, what Wise will SAY out loud)",
+      "prompt": "string (1+ chars, what Wise will SAY out loud — for
+        listening_comprehension this is the comprehension question)",
       "options": optional [ { "value": "string", "label": "string" } ],
       "expectedAnswer": optional (string for most types, null for open-ended),
       "explanation": optional "string",
       "skillTags": ["array of skill slug strings"],
-      "vocabularyTargets": ["array of vocab strings"]
+      "vocabularyTargets": ["array of vocab strings"],
+      "script": REQUIRED for listening_comprehension; omit otherwise. A
+        4-8 line Italian dialogue: [ { "speaker": "A"|"B", "text": "..." } ]
     }
   ],
   "recapPlan": "string"

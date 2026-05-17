@@ -121,8 +121,26 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
   // True once the user has tapped the orb. Ref so rapid double-taps see
   // the same value synchronously (state updates are async and would let
   // a second tap fire speak() again before the first finished).
+  //
+  // We also persist the "spoken once" flag to sessionStorage so the
+  // greeting doesn't re-voice every time the user navigates away and
+  // back to the command-center within the same tab. Without this gate,
+  // the page remount fetches a fresh greeting and the first orb tap
+  // replays it — which the user perceives as Wise repeating itself
+  // every time they come back to the page.
+  const GREETING_SESSION_KEY = 'sw:greetingVoicedOnce';
   const greetingPlayedRef = useRef(false);
   const [greetingPlayed, setGreetingPlayed] = useState(false);
+  // On mount: if this tab session already heard the greeting, mark it
+  // played so subsequent orb taps go straight to chat instead of
+  // re-greeting.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (sessionStorage.getItem(GREETING_SESSION_KEY) === '1') {
+      greetingPlayedRef.current = true;
+      setGreetingPlayed(true);
+    }
+  }, []);
 
   async function startComebackLesson() {
     if (!comeback) return;
@@ -279,6 +297,13 @@ export function CommandCenter({ firstName, sessionMinutes }: Props) {
     if (greeting && !greetingPlayedRef.current) {
       greetingPlayedRef.current = true;
       setGreetingPlayed(true);
+      // Persist across remounts so a tab navigation away-and-back
+      // doesn't replay the greeting. Cleared when the tab closes.
+      try {
+        sessionStorage.setItem(GREETING_SESSION_KEY, '1');
+      } catch {
+        /* private browsing or quota — non-fatal */
+      }
       // primeAudio MUST run inside this gesture handler before the TTS
       // fetch resolves — that unlocks the audio context for the session.
       await tutor.primeAudio();

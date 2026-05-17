@@ -99,6 +99,20 @@ export const LessonGenerationOutputSchema = z.object({
         // Models sometimes omit empty arrays — default to [] to be lenient
         // rather than reject the whole lesson.
         vocabularyTargets: z.array(z.string()).default([]),
+        // For listening_comprehension tasks: a multi-turn dialogue in
+        // Italian. The lesson player synthesizes each line with a
+        // different voice so the learner hears an actual conversation
+        // (customer + waiter at a trattoria, not a single narrator).
+        // Optional — only listening_comprehension tasks need it.
+        script: z
+          .array(
+            z.object({
+              speaker: z.enum(['A', 'B']),
+              text: z.string().min(1),
+            }),
+          )
+          .max(12)
+          .optional(),
       }),
     )
     .min(1),
