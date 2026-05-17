@@ -27,7 +27,14 @@
     "qa:e2e": "node --experimental-strip-types --env-file=.env scripts/qa-end-to-end.ts",
     "qa:audio": "node --experimental-strip-types --env-file=.env scripts/audio-multilingual-probe.ts",
     "user:create": "tsx scripts/create-user.ts",
-    "clean": "turbo run clean && rm -rf node_modules .turbo"
+    "clean": "turbo run clean && rm -rf node_modules .turbo",
+    "prepare": "simple-git-hooks || true"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "npx --no-install lint-staged --concurrent false"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,json}": ["biome check --write --no-errors-on-unmatched"]
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
@@ -35,6 +42,8 @@
     "@types/bcryptjs": "^2.4.6",
     "bcryptjs": "^2.4.3",
     "dotenv": "^16.4.7",
+    "lint-staged": "^17.0.5",
+    "simple-git-hooks": "^2.13.1",
     "tsx": "^4.19.2",
     "turbo": "^2.3.3",
     "typescript": "^5.7.2"
