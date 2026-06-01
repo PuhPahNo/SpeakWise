@@ -5,6 +5,7 @@
 // (flat skill/template/vocab arrays, integrity checks, the seeder) updates
 // automatically.
 
+import { extraLessonsByUnit } from './lessons';
 import type { SeedLessonTemplate, SeedSkill, SeedUnit, SeedVocab } from './types';
 
 import capPreliminare from './units/cap-00-preliminare';
@@ -51,6 +52,16 @@ export const italianCurriculumUnits: SeedUnit[] = [
   cap18,
   cap19,
 ].sort((a, b) => a.order - b.order);
+
+// Merge in the additional lesson templates authored under ./lessons/ (the
+// lesson-expansion pass). Each unit's inline templates come first, then its
+// extras — `order` is recomputed contiguously when the flat list is built.
+for (const u of italianCurriculumUnits) {
+  const extra = extraLessonsByUnit[u.code];
+  if (extra && extra.length > 0) {
+    u.lessonTemplates = [...u.lessonTemplates, ...extra];
+  }
+}
 
 /** Flat skill list across all units (back-compat with the original seed export). */
 export const italianCurriculumSeed: Array<SeedSkill & { unitCode: string; orderInUnit: number }> =
