@@ -9,11 +9,24 @@ import type { SeedLessonTemplate, SeedSkill, SeedUnit, SeedVocab } from './types
 
 import capPreliminare from './units/cap-00-preliminare';
 import cap01 from './units/cap-01-una-citta-italiana';
+import cap02 from './units/cap-02-come-siamo';
+import cap03 from './units/cap-03-studiare-in-italia';
+import cap04 from './units/cap-04-sport-e-passatempi';
+import cap05 from './units/cap-05-caffe-e-cappuccino';
+import cap06 from './units/cap-06-buon-appetito';
+import cap07 from './units/cap-07-la-vita-di-tutti-i-giorni';
 
 /** Every unit, in course order. Order is enforced by the `order` field, not array position. */
-export const italianCurriculumUnits: SeedUnit[] = [capPreliminare, cap01].sort(
-  (a, b) => a.order - b.order,
-);
+export const italianCurriculumUnits: SeedUnit[] = [
+  capPreliminare,
+  cap01,
+  cap02,
+  cap03,
+  cap04,
+  cap05,
+  cap06,
+  cap07,
+].sort((a, b) => a.order - b.order);
 
 /** Flat skill list across all units (back-compat with the original seed export). */
 export const italianCurriculumSeed: Array<SeedSkill & { unitCode: string; orderInUnit: number }> =
