@@ -21,6 +21,12 @@ import cap10 from './units/cap-10-buon-viaggio';
 import cap11 from './units/cap-11-spesa-e-spese';
 import cap12 from './units/cap-12-cercare-casa';
 import cap13 from './units/cap-13-difesa-dell-ambiente';
+import cap14 from './units/cap-14-musica-e-teatro';
+import cap15 from './units/cap-15-le-belle-arti';
+import cap16 from './units/cap-16-politica-e-societa';
+import cap17 from './units/cap-17-mondo-del-lavoro';
+import cap18 from './units/cap-18-societa-multiculturale';
+import cap19 from './units/cap-19-appendice';
 
 /** Every unit, in course order. Order is enforced by the `order` field, not array position. */
 export const italianCurriculumUnits: SeedUnit[] = [
@@ -38,6 +44,12 @@ export const italianCurriculumUnits: SeedUnit[] = [
   cap11,
   cap12,
   cap13,
+  cap14,
+  cap15,
+  cap16,
+  cap17,
+  cap18,
+  cap19,
 ].sort((a, b) => a.order - b.order);
 
 /** Flat skill list across all units (back-compat with the original seed export). */
