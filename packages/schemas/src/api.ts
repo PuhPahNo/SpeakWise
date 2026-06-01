@@ -138,6 +138,19 @@ export const WiseExplainRequestSchema = z.object({
     .optional(),
 });
 
+/** Streaming text chat with Wise. The client keeps the running history. */
+export const WiseChatRequestSchema = z.object({
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(['user', 'assistant']),
+        content: z.string().min(1).max(8000),
+      }),
+    )
+    .min(1)
+    .max(40),
+});
+
 export const GenerateLessonRequestSchema = z.object({
   lessonType: z.enum([
     'daily_mission',

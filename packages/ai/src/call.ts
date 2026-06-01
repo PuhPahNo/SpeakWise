@@ -115,6 +115,41 @@ export async function chatStructured<S extends ZodTypeAny>(
   }
 }
 
+export interface ChatStreamOptions {
+  promptKey: string;
+  promptVersion?: number;
+  vars: Record<string, string>;
+  /** The running conversation (user/assistant turns), oldest first. */
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+  model?: string;
+  temperature?: number;
+  maxOutputTokens?: number;
+}
+
+/**
+ * Stream a plain-text chat reply token-by-token. Unlike chatStructured (JSON
+ * mode, awaited whole), this yields deltas as they arrive so the UI can render
+ * them live — the difference between "instant-feeling" and a multi-second wait.
+ * For conversational text only; structured/product-state outputs stay on
+ * chatStructured.
+ */
+export async function* streamChat(opts: ChatStreamOptions): AsyncGenerator<string> {
+  const tpl = await loadPrompt(opts.promptKey, opts.promptVersion);
+  const system = renderPrompt(tpl.body, opts.vars);
+  const openai = getOpenAI();
+  const stream = await openai.chat.completions.create({
+    model: opts.model ?? Models.fast,
+    temperature: opts.temperature ?? 0.6,
+    max_tokens: opts.maxOutputTokens ?? 800,
+    stream: true,
+    messages: [{ role: 'system', content: system }, ...opts.messages],
+  });
+  for await (const chunk of stream) {
+    const delta = chunk.choices[0]?.delta?.content;
+    if (delta) yield delta;
+  }
+}
+
 export interface TranscribeInput {
   audio: ArrayBuffer | Blob;
   filename?: string;

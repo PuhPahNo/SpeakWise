@@ -102,6 +102,11 @@ export interface VoiceTutor {
   mode: 'voice' | 'text';
 }
 
+// Network timeouts so a slow or hung TTS / STT call can never freeze the orb
+// in "thinking" forever — it recovers to a tappable state instead.
+const TTS_TIMEOUT_MS = 30_000;
+const TRANSCRIBE_TIMEOUT_MS = 30_000;
+
 export function useVoiceTutor(opts: Options): VoiceTutor {
   const [state, setState] = useState<VoiceState>('idle');
   const [amplitude, setAmplitude] = useState(0);
@@ -290,8 +295,14 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
     const lang = opts.sttLanguage ?? 'auto';
     if (lang === 'en' || lang === 'it') fd.append('language', lang);
 
+    const tAbort = new AbortController();
+    const tTimer = setTimeout(() => tAbort.abort(), TRANSCRIBE_TIMEOUT_MS);
     try {
-      const res = await fetch('/api/voice/transcribe', { method: 'POST', body: fd });
+      const res = await fetch('/api/voice/transcribe', {
+        method: 'POST',
+        body: fd,
+        signal: tAbort.signal,
+      });
       if (!res.ok) throw new Error(`transcribe failed: ${res.status}`);
       const data = (await res.json()) as { text?: string; language?: string };
       const text = (data.text ?? '').trim();
@@ -301,9 +312,11 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
       }
       setState('idle');
     } catch (e) {
-      console.error('voice tutor: transcription failed', e);
+      console.error('voice tutor: transcription failed/timed out', e);
       setState('error');
       setTimeout(() => setState('idle'), 1500);
+    } finally {
+      clearTimeout(tTimer);
     }
   }, [cleanupRecording, opts]);
 
@@ -363,6 +376,14 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
       let played = false;
       const abort = new AbortController();
       ttsAbortRef.current = abort;
+      // Hard timeout so a slow/failed TTS can never leave the orb stuck in
+      // "thinking" forever (the original infinite-hang bug). On timeout we
+      // abort and recover to idle below.
+      let timedOut = false;
+      const timer = setTimeout(() => {
+        timedOut = true;
+        abort.abort();
+      }, TTS_TIMEOUT_MS);
       try {
         const res = await fetch('/api/voice/speak', {
           method: 'POST',
@@ -425,11 +446,20 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
           setState('awaiting_user_response');
         }
       } catch (e) {
-        // AbortError on supersession is expected — drop quietly.
-        if ((e as { name?: string })?.name === 'AbortError') return false;
+        if ((e as { name?: string })?.name === 'AbortError') {
+          // Timed out → recover to a tappable state so the orb isn't stuck.
+          // A plain supersession abort (newer speak started) is dropped
+          // quietly — that newer call owns the state.
+          if (timedOut) {
+            console.warn('voice tutor: TTS timed out');
+            setState('idle');
+          }
+          return false;
+        }
         console.error('voice tutor: TTS failed', e);
         setState('awaiting_user_response');
       } finally {
+        clearTimeout(timer);
         if (ttsAbortRef.current === abort) ttsAbortRef.current = null;
       }
       return played;
@@ -450,11 +480,14 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
       }
       setState('thinking');
       let played = false;
+      const pAbort = new AbortController();
+      const pTimer = setTimeout(() => pAbort.abort(), TTS_TIMEOUT_MS);
       try {
         const res = await fetch('/api/voice/speak', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text, language: opts.ttsLanguage ?? 'auto' }),
+          signal: pAbort.signal,
         });
         if (!res.ok) throw new Error(`tts failed: ${res.status}`);
         const blob = await res.blob();
@@ -484,8 +517,9 @@ export function useVoiceTutor(opts: Options): VoiceTutor {
             });
         });
       } catch (e) {
-        console.error('voice tutor: playOnce failed', e);
+        console.error('voice tutor: playOnce failed/timed out', e);
       } finally {
+        clearTimeout(pTimer);
         if (playerRef.current?.paused !== false) playerRef.current = null;
         setState('idle');
       }

@@ -327,11 +327,11 @@ export function CommandCenter({ firstName, sessionMinutes, defaultMode = 'voice'
           flipping here doesn't change the saved default. */}
       <button
         type="button"
-        onClick={() => setMode(mode === 'voice' ? 'text' : 'voice')}
+        onClick={() => (mode === 'voice' ? router.push('/chat') : setMode('voice'))}
         className="inline-flex items-center gap-1.5 rounded-full surface px-3 py-1 text-xs text-ink-200 hover:text-ink-50 hover:border-wise-500/40 transition"
         title={
           mode === 'voice'
-            ? 'Switch to text — type your replies instead'
+            ? 'Prefer typing? Open the text chat with Wise'
             : 'Switch to voice — tap the orb and speak'
         }
       >
@@ -339,7 +339,7 @@ export function CommandCenter({ firstName, sessionMinutes, defaultMode = 'voice'
           <>
             <Mic size={12} className="text-wise-300" aria-hidden />
             <span>Voice mode</span>
-            <span className="opacity-60">· tap to type</span>
+            <span className="opacity-60">· prefer typing? →</span>
           </>
         ) : (
           <>
@@ -471,12 +471,21 @@ export function CommandCenter({ firstName, sessionMinutes, defaultMode = 'voice'
         </a>
       </div>
 
+      {/* Text chat is the instant, no-latency way to talk with Wise — make it
+          a clear, primary entry alongside the voice orb. */}
+      <a
+        href="/chat"
+        className="w-full max-w-xl inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 surface border-wise-500/40 text-ink-50 hover:border-wise-500/70 transition text-sm font-medium"
+      >
+        <MessageSquareText size={16} className="text-wise-300" aria-hidden />
+        Chat with Wise — type instead of talk
+      </a>
       <div className="grid grid-cols-2 gap-3 w-full max-w-xl text-sm">
         <a
           href="/talk"
           className="text-center rounded-xl px-4 py-3 surface text-ink-100 hover:text-ink-50 hover:border-wise-500/40 transition"
         >
-          Talk freely with Wise
+          Talk freely (voice)
         </a>
         <a
           href="/lessons"
