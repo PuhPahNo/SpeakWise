@@ -77,6 +77,47 @@ export async function listUnits() {
   });
 }
 
+/**
+ * The course path with the learner's progress per chapter: how many of the
+ * unit's skills they've started and how many they've reached proficiency on.
+ * Drives the /course overview.
+ */
+export async function getCourseProgress(userId: string) {
+  const units = await prisma.curriculumUnit.findMany({
+    where: { isActive: true },
+    orderBy: { order: 'asc' },
+    select: {
+      id: true,
+      code: true,
+      order: true,
+      title: true,
+      subtitle: true,
+      theme: true,
+      level: true,
+      summary: true,
+      canDo: true,
+      skills: { select: { id: true } },
+    },
+  });
+  const progress = await prisma.userSkillProgress.findMany({
+    where: { userId },
+    select: { skillId: true, status: true },
+  });
+  const statusBySkill = new Map(progress.map((p) => [p.skillId, p.status]));
+
+  return units.map(({ skills, ...rest }) => {
+    let started = 0;
+    let mastered = 0;
+    for (const s of skills) {
+      const st = statusBySkill.get(s.id);
+      if (!st || st === 'not_started') continue;
+      started++;
+      if (st === 'proficient' || st === 'mastered') mastered++;
+    }
+    return { ...rest, total: skills.length, started, mastered };
+  });
+}
+
 /** One chapter with its skills, lesson templates, and thematic vocabulary. */
 export async function getUnitDetail(code: string) {
   return prisma.curriculumUnit.findUnique({

@@ -72,6 +72,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <Link href="/command-center" className="hover:text-ink-50 transition">
               {navLabel('Home', 'Casa', ratio, immersion)}
             </Link>
+            <Link href="/course" className="hover:text-ink-50 transition">
+              {navLabel('Course', 'Corso', ratio, immersion)}
+            </Link>
             <Link href="/talk" className="hover:text-ink-50 transition">
               {navLabel('Talk', 'Parla', ratio, immersion)}
             </Link>
