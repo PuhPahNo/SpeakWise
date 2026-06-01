@@ -228,9 +228,44 @@ export const WiseTurnOutputSchema = z.object({
   audioUrl: z.string().url().optional(),
 });
 
+/**
+ * A mid-lesson "why?" explanation. The learner asked a question (often "why is
+ * this wrong?") without leaving the task. Wise answers it directly, then nudges
+ * them back to the lesson — it must NOT restart or change the lesson.
+ */
+export const WiseExplainOutputSchema = z.object({
+  /** The clear, level-appropriate answer to the learner's question, spoken aloud. */
+  explanation: z.string().min(1),
+  /** Optional one-line takeaway the learner can hold onto. */
+  keyPoint: z.string().nullable().optional(),
+});
+
+/**
+ * Heuristic pronunciation read for a spoken answer. Within-stack approximation:
+ * it coaches the hard sounds of the TARGET phrase and flags where what was heard
+ * diverged from what was expected. Not lab-grade acoustic phoneme scoring.
+ */
+export const PronunciationAssessmentOutputSchema = z.object({
+  /** 0..1 overall clarity/closeness of the spoken attempt to the target. */
+  clarityScore: z.number().min(0).max(1),
+  /** Specific sound/word notes, e.g. { sound: "doppia c", note: "hold it longer" }. */
+  issues: z
+    .array(z.object({ sound: z.string(), note: z.string() }))
+    .max(4)
+    .default([]),
+  /** One concrete, encouraging coaching tip the learner can act on next time. */
+  tip: z.string(),
+  /** True when the attempt was clear enough to count as well-pronounced. */
+  soundsGood: z.boolean(),
+});
+
 export type LessonGenerationOutputParsed = z.infer<typeof LessonGenerationOutputSchema>;
 export type CorrectionOutputParsed = z.infer<typeof CorrectionOutputSchema>;
 export type MemoryExtractionOutputParsed = z.infer<typeof MemoryExtractionOutputSchema>;
 export type ProgressReportOutputParsed = z.infer<typeof ProgressReportOutputSchema>;
 export type PlacementAssessmentOutputParsed = z.infer<typeof PlacementAssessmentOutputSchema>;
 export type WiseTurnOutputParsed = z.infer<typeof WiseTurnOutputSchema>;
+export type WiseExplainOutputParsed = z.infer<typeof WiseExplainOutputSchema>;
+export type PronunciationAssessmentOutputParsed = z.infer<
+  typeof PronunciationAssessmentOutputSchema
+>;

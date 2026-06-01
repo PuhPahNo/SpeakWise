@@ -1,7 +1,11 @@
 import { Models, chatStructured } from '@speakwise/ai';
 import { prisma } from '@speakwise/db';
 import { emitUserEvent } from '@speakwise/events';
-import { type WiseMessageRequest, WiseTurnOutputSchema } from '@speakwise/schemas';
+import {
+  WiseExplainOutputSchema,
+  type WiseMessageRequest,
+  WiseTurnOutputSchema,
+} from '@speakwise/schemas';
 import { z } from 'zod';
 import { getActiveDirectiveForStudent } from '../classroom';
 import { getActiveSkills, getSkillsDueForReview } from '../curriculum';
@@ -262,4 +266,125 @@ export async function recommendNext(userId: string) {
     reason: 'Time for today’s mission.',
     lesson: null,
   };
+}
+
+export interface ExplainInput {
+  question: string;
+  context?: {
+    lessonId?: string;
+    lessonTaskId?: string;
+    userResponseId?: string;
+    taskPrompt?: string;
+    lastAnswer?: string;
+  };
+}
+
+/**
+ * Answer a learner's mid-lesson "why?" question (the floating Ask Wise helper).
+ * Pulls the current task + the learner's last answer/correction so "why is this
+ * wrong?" is grounded in their actual sentence. Read-only: it does not change,
+ * advance, or re-grade the lesson.
+ */
+export async function explainConcept(userId: string, input: ExplainInput) {
+  const profile = await getWiseProfileSummary(userId);
+  const ctx = input.context ?? {};
+
+  // Resolve the current task (if the client passed its id) for grounded context.
+  let task: {
+    taskType: string;
+    prompt: string;
+    expectedAnswer: unknown;
+    skillNames: string[];
+  } | null = null;
+  if (ctx.lessonTaskId) {
+    const t = await prisma.lessonTask.findFirst({
+      where: { id: ctx.lessonTaskId, lesson: { userId } },
+    });
+    if (t) {
+      const skillNames =
+        t.targetSkillIds.length > 0
+          ? (
+              await prisma.curriculumSkill.findMany({
+                where: { id: { in: t.targetSkillIds } },
+                select: { name: true },
+              })
+            ).map((s) => s.name)
+          : [];
+      task = {
+        taskType: t.taskType,
+        prompt: t.prompt,
+        expectedAnswer: t.expectedAnswer,
+        skillNames,
+      };
+    }
+  }
+
+  // Resolve the learner's last answer + correction so "why was I wrong?" works.
+  let lastAttempt: {
+    answer: string;
+    isCorrect: boolean | null;
+    correctedAnswer: string | null;
+    correctionExplanation: string | null;
+  } | null = null;
+  if (ctx.userResponseId) {
+    const ur = await prisma.userResponse.findFirst({
+      where: { id: ctx.userResponseId, session: { userId } },
+      include: { corrections: true },
+    });
+    if (ur) {
+      const corr = ur.corrections[0];
+      lastAttempt = {
+        answer: ur.userAnswer,
+        isCorrect: ur.isCorrect,
+        correctedAnswer: ur.correctedAnswer ?? corr?.correctedText ?? null,
+        correctionExplanation: corr?.explanation ?? ur.feedback ?? null,
+      };
+    }
+  }
+
+  const context = {
+    // Fall back to the lighter on-screen context the client always has.
+    task:
+      task ??
+      (ctx.taskPrompt
+        ? { taskType: 'unknown', prompt: ctx.taskPrompt, expectedAnswer: null, skillNames: [] }
+        : null),
+    lastAttempt:
+      lastAttempt ??
+      (ctx.lastAnswer
+        ? {
+            answer: ctx.lastAnswer,
+            isCorrect: null,
+            correctedAnswer: null,
+            correctionExplanation: null,
+          }
+        : null),
+  };
+
+  const result = await chatStructured({
+    promptKey: 'wise.explain',
+    purpose: 'wise.explain',
+    schema: WiseExplainOutputSchema,
+    model: Models.fast,
+    temperature: 0.4,
+    maxOutputTokens: 600,
+    vars: {
+      QUESTION: input.question,
+      CONTEXT_JSON: JSON.stringify(context),
+      LEVEL: String(profile?.level ?? 'beginner'),
+      LANGUAGE_RATIO: String(profile?.languageRatio ?? 0.1),
+    },
+  });
+
+  await emitUserEvent(userId, 'AICall', {
+    provider: 'openai',
+    model: result.usage.model,
+    purpose: 'wise.explain',
+    tokensIn: result.usage.promptTokens,
+    tokensOut: result.usage.completionTokens,
+    latencyMs: result.usage.latencyMs,
+    ok: true,
+  });
+
+  return result.data;
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { AskWise } from '@/components/lesson/ask-wise';
 import { VoiceOrb } from '@/components/voice/voice-orb';
 import { useVoiceTutor } from '@/hooks/use-voice-tutor';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -96,6 +97,10 @@ export function LessonPlayer({
   const [xpEarned, setXpEarned] = useState<number | null>(null);
   const [streakDays, setStreakDays] = useState<number | null>(null);
   const [newMemory, setNewMemory] = useState<Array<{ type: string; content: string }>>([]);
+  // Tracked so the floating "Ask Wise" helper can ground a "why was I wrong?"
+  // question in the learner's actual last answer + its correction.
+  const [lastResponseId, setLastResponseId] = useState<string | null>(null);
+  const [lastAnswerSent, setLastAnswerSent] = useState('');
   // Per-session interaction mode for the lesson. Initialized from the
   // profile default; flippable inline via the chip in the header so a
   // text-mode user can opt into voice for one lesson without changing
@@ -257,6 +262,8 @@ export function LessonPlayer({
       });
       const data = await res.json();
       const c = data.correction as Record<string, unknown>;
+      setLastResponseId((data.userResponse as { id?: string })?.id ?? null);
+      setLastAnswerSent(a);
       const isCorrect = Boolean((data.userResponse as { isCorrect?: boolean }).isCorrect);
       const correctionPayload: CorrectionData = {
         isCorrect,
@@ -428,6 +435,18 @@ export function LessonPlayer({
   // ── Task / Correction ────────────────────────────────────────────────
   return (
     <div className="flex flex-col items-center gap-6">
+      {/* Floating "Ask Wise" — available all through the task + correction
+          phases so a stuck learner can ask "why?" by voice or text without
+          submitting or skipping. Grounded in the current task + last answer. */}
+      <AskWise
+        context={{
+          lessonId: lesson.id,
+          lessonTaskId: currentTask?.id,
+          userResponseId: phase === 'correction' ? (lastResponseId ?? undefined) : undefined,
+          taskPrompt: currentTask?.prompt,
+          lastAnswer: phase === 'correction' ? lastAnswerSent || undefined : undefined,
+        }}
+      />
       <div className="flex items-center justify-between w-full max-w-xl gap-3">
         <div className="text-xs text-ink-200 uppercase tracking-[0.2em]">
           {taskIndex + 1} / {tasks.length} · {currentTask?.taskType.replace(/_/g, ' ')}

@@ -119,6 +119,25 @@ export const WiseMessageRequestSchema = z.object({
 
 export const WiseMessageResponseSchema = WiseTurnOutputSchema;
 
+/**
+ * A mid-lesson "ask Wise" question. Context anchors the explanation to the
+ * exact task and the learner's last attempt so "why is this wrong?" works.
+ */
+export const WiseExplainRequestSchema = z.object({
+  question: z.string().min(1).max(2000),
+  context: z
+    .object({
+      lessonId: z.string().uuid().optional(),
+      lessonTaskId: z.string().uuid().optional(),
+      userResponseId: z.string().uuid().optional(),
+      // Fallback context the client already has on screen, used when the
+      // task/response rows aren't passed (e.g. before the first answer).
+      taskPrompt: z.string().max(2000).optional(),
+      lastAnswer: z.string().max(2000).optional(),
+    })
+    .optional(),
+});
+
 export const GenerateLessonRequestSchema = z.object({
   lessonType: z.enum([
     'daily_mission',
