@@ -24,7 +24,9 @@ services:
     # Install pnpm via npm (writable global prefix). `corepack enable` fails on
     # Render's builder with EROFS because it tries to symlink into read-only
     # /usr/bin. Build runs from the repo root so pnpm resolves the workspace.
-    buildCommand: npm install -g pnpm@9.12.0 && pnpm install --frozen-lockfile && pnpm --filter @speakwise/db prisma:generate && pnpm --filter speakwise-web build
+    # --prod=false: NODE_ENV=production otherwise makes pnpm skip devDependencies,
+    # but prisma/tsx/typescript/tailwind are devDeps needed at build + pre-deploy.
+    buildCommand: npm install -g pnpm@9.12.0 && pnpm install --frozen-lockfile --prod=false && pnpm --filter @speakwise/db prisma:generate && pnpm --filter speakwise-web build
     # Runs after build, before the new version goes live, with DB + env access.
     # No migrations in this repo — schema is applied via `prisma db push`; the
     # seed (curriculum + prompts) is idempotent. Both safe to run every deploy.
