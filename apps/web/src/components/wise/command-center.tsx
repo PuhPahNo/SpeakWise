@@ -21,6 +21,12 @@ interface WiseTurn {
   actions: Array<{ type: string; lessonId?: string }>;
 }
 
+interface Turn {
+  role: 'user' | 'wise';
+  text: string;
+  ts: number;
+}
+
 interface GreetingResponse {
   greeting: string;
   context: {
@@ -51,6 +57,10 @@ export function CommandCenter({ firstName, sessionMinutes, defaultMode = 'voice'
   const [wiseLine, setWiseLine] = useState<string>('');
   const [userLine, setUserLine] = useState<string>('');
   const [pending, setPending] = useState(false);
+  // Running transcript of the spoken conversation (folded in from the old
+  // Freestyle/Talk page so Home is the single conversational surface).
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const convoRef = useRef<HTMLDivElement>(null);
   const greetedRef = useRef(false);
   // Italian language settings — fetched on mount so the bilingual
   // labels (Inizia/Start, Ripasso/Review) pick the right word. The
@@ -82,6 +92,15 @@ export function CommandCenter({ firstName, sessionMinutes, defaultMode = 'voice'
     }
   };
 
+  const addTurn = (role: 'user' | 'wise', text: string) =>
+    setTurns((t) => [...t, { role, text, ts: Date.now() }]);
+
+  // Keep the transcript pinned to the latest turn.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll on new turns
+  useEffect(() => {
+    convoRef.current?.scrollTo({ top: convoRef.current.scrollHeight, behavior: 'smooth' });
+  }, [turns]);
+
   const tutor = useVoiceTutor({
     // Auto-detect on both ends: the learner might reply in either
     // language on this screen, and Wise's reply mixes naturally. Italian
@@ -98,6 +117,7 @@ export function CommandCenter({ firstName, sessionMinutes, defaultMode = 'voice'
     mode,
     onUserSpeech: async (text) => {
       setUserLine(text);
+      addTurn('user', text);
       await sendToWise(text);
     },
   });
@@ -201,6 +221,7 @@ export function CommandCenter({ firstName, sessionMinutes, defaultMode = 'voice'
       });
       const data: WiseTurn = await res.json();
       setWiseLine(data.wiseMessage);
+      addTurn('wise', data.wiseMessage);
 
       // The model occasionally returns a START_LESSON with a skill slug or
       // topic label as lessonId. Treat any non-UUID lessonId as an
@@ -235,6 +256,7 @@ export function CommandCenter({ firstName, sessionMinutes, defaultMode = 'voice'
     } catch {
       const fallback = 'Sorry — I missed that. Try again?';
       setWiseLine(fallback);
+      addTurn('wise', fallback);
       await tutor.speak(fallback);
     } finally {
       setPending(false);
@@ -398,6 +420,29 @@ export function CommandCenter({ firstName, sessionMinutes, defaultMode = 'voice'
 
           <p className="text-xs text-ink-200 -mt-2">{statusText()}</p>
 
+          {/* Running transcript — appears once a spoken conversation starts.
+              This is the freestyle "Talk" experience, folded into Home. */}
+          {turns.length > 0 && (
+            <div
+              ref={convoRef}
+              className="w-full max-w-xl max-h-[34vh] overflow-y-auto surface rounded-2xl p-4 space-y-2.5"
+            >
+              {turns.map((t) => (
+                <div key={t.ts} className={t.role === 'user' ? 'text-right' : 'text-left'}>
+                  <div
+                    className={`inline-block max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-snug ${
+                      t.role === 'user'
+                        ? 'bg-wise-500/15 border border-wise-500/25 text-ink-50'
+                        : 'bg-white/5 border border-white/10 text-ink-50'
+                    }`}
+                  >
+                    {t.text}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {comeback && (
             <button
               onClick={startComebackLesson}
@@ -446,16 +491,10 @@ export function CommandCenter({ firstName, sessionMinutes, defaultMode = 'voice'
             </a>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 w-full max-w-xl text-sm">
-            <a
-              href="/talk"
-              className="text-center rounded-xl px-4 py-3 surface text-ink-100 hover:text-ink-50 hover:border-wise-500/40 transition"
-            >
-              Talk freely (voice)
-            </a>
+          <div className="w-full max-w-xl text-sm">
             <a
               href="/lessons"
-              className="text-center rounded-xl px-4 py-3 surface text-ink-100 hover:text-ink-50 hover:border-wise-500/40 transition"
+              className="block text-center rounded-xl px-4 py-3 surface text-ink-100 hover:text-ink-50 hover:border-wise-500/40 transition"
             >
               Past lessons
             </a>

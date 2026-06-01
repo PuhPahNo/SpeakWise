@@ -1,18 +1,9 @@
-import { Freestyle } from '@/components/wise/freestyle';
-import { getOrCreateUser } from '@/lib/auth/current-user';
-import { ensureProfile } from '@/server/services/profile';
 import { redirect } from 'next/navigation';
 
-export const metadata = { title: 'Talk to Wise · Speakwise' };
-
-export default async function TalkPage() {
-  const user = await getOrCreateUser();
-  const profile = await ensureProfile(user.id);
-  if (!profile.onboardingCompleted) redirect('/onboarding');
-  const firstName = user.name.split(' ')[0] ?? user.name;
-  return (
-    <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
-      <Freestyle firstName={firstName} />
-    </div>
-  );
+// The freestyle "Talk" surface was folded into Home — the command-center
+// orb now carries the spoken conversation (with a running transcript) and a
+// Voice/Chat toggle. Keep this route as a redirect so old links/bookmarks
+// still land somewhere sensible.
+export default function TalkPage() {
+  redirect('/command-center');
 }
