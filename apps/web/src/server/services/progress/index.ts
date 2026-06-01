@@ -35,7 +35,7 @@ export async function recordSkillEvidence({
   userId,
   skillId,
   correct,
-  weight = 0.1,
+  weight = 1,
   dimension = 'both',
 }: RecordResultOpts) {
   const prev = await prisma.userSkillProgress.upsert({
@@ -45,18 +45,32 @@ export async function recordSkillEvidence({
   });
 
   const oldScore = Number(prev.masteryScore);
-  const delta = correct ? weight : -weight * 0.7;
-  const newScore = Math.max(0, Math.min(1, oldScore + delta));
-
-  // Per-dimension scores let Wise stretch the learner safely — speak a
-  // structure to them when comprehension is high but production is low,
-  // and only ask them to produce it once comprehension lands.
   const oldComp = Number(prev.comprehensionScore);
   const oldProd = Number(prev.productionScore);
-  const compDelta = dimension === 'comprehension' || dimension === 'both' ? delta : delta * 0.3;
-  const prodDelta = dimension === 'production' || dimension === 'both' ? delta : delta * 0.2;
-  const newComp = Math.max(0, Math.min(1, oldComp + compDelta));
-  const newProd = Math.max(0, Math.min(1, oldProd + prodDelta));
+
+  // EMA toward mastery rather than a flat ±delta. A correct answer moves the
+  // score a fraction of the remaining distance to 1.0 — fast and motivating
+  // early (≈4 clean reps → proficient 0.7, ≈6 → mastered 0.85), asymptotic
+  // near the top so mastery is earned, not farmed. A miss costs a proportional
+  // slice (you lose ground, not everything). `weight` (0..1) scales the step so
+  // a low-confidence or partial-credit signal nudges less than a clean one.
+  const GAIN = 0.3 * weight;
+  const PENALTY = 0.25 * weight;
+  const bump = (old: number, factor: number): number => {
+    const next = correct ? old + (1 - old) * GAIN * factor : old - old * PENALTY * factor;
+    return Math.max(0, Math.min(1, next));
+  };
+
+  const newScore = bump(oldScore, 1);
+  // Per-dimension scores let Wise stretch the learner safely — speak a
+  // structure to them when comprehension is high but production is low, and
+  // only ask them to produce it once comprehension lands. The off-dimension
+  // still moves a little (recognizing a form helps you produce it, and vice
+  // versa), just less.
+  const compFactor = dimension === 'comprehension' || dimension === 'both' ? 1 : 0.3;
+  const prodFactor = dimension === 'production' || dimension === 'both' ? 1 : 0.2;
+  const newComp = bump(oldComp, compFactor);
+  const newProd = bump(oldProd, prodFactor);
 
   const correctCount = prev.correctCount + (correct ? 1 : 0);
   const incorrectCount = prev.incorrectCount + (correct ? 0 : 1);

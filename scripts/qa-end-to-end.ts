@@ -578,6 +578,7 @@ async function main() {
       const answer =
         task.expectedAnswer || (task.options as string[] | null)?.[0] || 'Sì, va bene.';
       const r = await api<{
+        userResponse: { isCorrect?: boolean | null };
         correction: { isCorrect?: boolean };
         nextTask: unknown;
       }>('POST', '/api/practice/respond', cookie, {
@@ -591,7 +592,10 @@ async function main() {
         break;
       }
       answered++;
-      if (r.data.correction?.isCorrect) correctCount++;
+      // The verdict lives on userResponse.isCorrect (correction is the Correction
+      // row, which has no isCorrect). Reading the wrong field made this always
+      // report 0 correct.
+      if (r.data.userResponse?.isCorrect) correctCount++;
     }
     pass('walked tasks', `${answered}/${tasks.length} answered, ${correctCount} correct`);
 
@@ -608,6 +612,122 @@ async function main() {
       );
     } else {
       pass('lesson completed');
+    }
+  }
+
+  // ── 7b. Grading + pronunciation regression ──────────────────────
+  // Guards two real defects found by the local e2e run:
+  //   - the isCorrect verdict must REACH the client (it once came back null,
+  //     so the lesson player rendered every answer as "Not quite");
+  //   - a voice answer on a speaking task must return pronunciation coaching.
+  log('\n7b. GRADING + PRONUNCIATION REGRESSION');
+  {
+    type GenTask = { id: string; taskType: string; expectedAnswer?: unknown; options?: unknown };
+    const expStr = (e: unknown): string =>
+      typeof e === 'string'
+        ? e
+        : e && typeof e === 'object'
+          ? String((e as { value?: unknown }).value ?? '')
+          : '';
+
+    const g = await api<{ lesson: { id: string }; tasks: GenTask[] }>(
+      'POST',
+      '/api/lessons/generate',
+      cookie,
+      { lessonType: 'grammar', interestTheme: 'food' },
+    );
+    const objTask = g.data.tasks?.find(
+      (t) =>
+        (t.taskType === 'multiple_choice' || t.taskType === 'fill_blank') &&
+        t.expectedAnswer != null,
+    );
+    if (g.status === 200 && objTask) {
+      const ss = await api<{ session: { id: string } }>(
+        'POST',
+        `/api/lessons/${g.data.lesson.id}/start`,
+        cookie,
+        { mode: 'text' },
+      );
+      const sid = ss.data.session.id;
+      const itype = objTask.taskType === 'multiple_choice' ? 'multiple_choice' : 'text';
+      const okRes = await api<{ userResponse: { isCorrect?: boolean | null } }>(
+        'POST',
+        '/api/practice/respond',
+        cookie,
+        {
+          sessionId: sid,
+          lessonTaskId: objTask.id,
+          inputType: itype,
+          answer: expStr(objTask.expectedAnswer),
+        },
+      );
+      if (okRes.data.userResponse?.isCorrect === true) {
+        pass('correct answer graded correct', `verdict reaches client (${objTask.taskType})`);
+      } else {
+        fail(
+          'correct answer graded correct',
+          `expected isCorrect=true, got ${okRes.data.userResponse?.isCorrect} (regression: null verdict)`,
+        );
+      }
+      const wrongRes = await api<{ userResponse: { isCorrect?: boolean | null } }>(
+        'POST',
+        '/api/practice/respond',
+        cookie,
+        {
+          sessionId: sid,
+          lessonTaskId: objTask.id,
+          inputType: itype,
+          answer: 'definitely-not-the-answer-xyz',
+        },
+      );
+      if (wrongRes.data.userResponse?.isCorrect === false) {
+        pass('wrong answer graded wrong');
+      } else {
+        fail(
+          'wrong answer graded wrong',
+          `expected isCorrect=false, got ${wrongRes.data.userResponse?.isCorrect}`,
+        );
+      }
+    } else {
+      fail('grading regression setup', `generate ${g.status} or no objective task`);
+    }
+
+    const sg = await api<{ lesson: { id: string }; tasks: GenTask[] }>(
+      'POST',
+      '/api/lessons/generate',
+      cookie,
+      { lessonType: 'speaking_challenge', interestTheme: 'food' },
+    );
+    const spk = sg.data.tasks?.find((t) =>
+      ['speaking_prompt', 'translation', 'roleplay'].includes(t.taskType),
+    );
+    if (sg.status === 200 && spk) {
+      const ss = await api<{ session: { id: string } }>(
+        'POST',
+        `/api/lessons/${sg.data.lesson.id}/start`,
+        cookie,
+        { mode: 'voice' },
+      );
+      const target = expStr(spk.expectedAnswer) || 'Vorrei un caffè, per favore.';
+      const pr = await api<{ pronunciation: { tip?: string } | null }>(
+        'POST',
+        '/api/practice/respond',
+        cookie,
+        { sessionId: ss.data.session.id, lessonTaskId: spk.id, inputType: 'voice', answer: target },
+      );
+      if (pr.data.pronunciation && typeof pr.data.pronunciation.tip === 'string') {
+        pass(
+          'voice answer returns pronunciation coaching',
+          `"${pr.data.pronunciation.tip.slice(0, 48)}…"`,
+        );
+      } else {
+        fail(
+          'voice answer returns pronunciation coaching',
+          'no pronunciation on a voice speaking answer',
+        );
+      }
+    } else {
+      fail('pronunciation regression setup', `generate ${sg.status} or no speaking task`);
     }
   }
 
@@ -1168,9 +1288,11 @@ async function main() {
     // 30-day activity has exactly 30 days
     if (d.activity30.length === 30) pass('activity30 has 30 days');
     else fail('activity30 length', String(d.activity30.length));
-    // Coming next should always have something (either from progress or empty-state fallback)
-    if (d.comingNext.length >= 3) pass('comingNext non-empty', String(d.comingNext.length));
-    else fail('comingNext too short', String(d.comingNext.length));
+    // Coming next should always have something (either from progress or
+    // empty-state fallback). A brand-new account legitimately has only 1-2
+    // started skills, so the real requirement is non-empty, not a fixed count.
+    if (d.comingNext.length >= 1) pass('comingNext non-empty', String(d.comingNext.length));
+    else fail('comingNext empty', String(d.comingNext.length));
     // After the tutor directive was issued in Phase 12, the dashboard's
     // coming-next list should mark the pinned skill as pinnedByTutor.
     const anyPinned = d.comingNext.some((s) => s.pinnedByTutor === true);
