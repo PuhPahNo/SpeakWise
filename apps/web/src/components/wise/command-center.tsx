@@ -2,8 +2,9 @@
 
 import { useToast } from '@/components/ui/toast';
 import { VoiceOrb } from '@/components/voice/voice-orb';
+import { WiseChat } from '@/components/wise/wise-chat';
 import { useVoiceTutor } from '@/hooks/use-voice-tutor';
-import { Flame, MessageSquareText, Mic, Send, Sparkles, Volume2 } from 'lucide-react';
+import { Flame, MessageSquareText, Mic, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
@@ -61,8 +62,25 @@ export function CommandCenter({ firstName, sessionMinutes, defaultMode = 'voice'
   // passed by the server but tweakable inline so users can flip into a
   // voice conversation without changing their profile preference.
   const [mode, setMode] = useState<'voice' | 'text'>(defaultMode);
-  // Text-mode draft input. Used when mode === 'text'.
-  const [textInput, setTextInput] = useState('');
+
+  // Remember the chosen interface across visits (per-browser). Initialized
+  // from the profile default; the segmented toggle below persists changes.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('sw:homeMode');
+      if (saved === 'voice' || saved === 'text') setMode(saved);
+    } catch {
+      /* private mode / no storage — keep the profile default */
+    }
+  }, []);
+  const switchMode = (m: 'voice' | 'text') => {
+    setMode(m);
+    try {
+      localStorage.setItem('sw:homeMode', m);
+    } catch {
+      /* non-fatal */
+    }
+  };
 
   const tutor = useVoiceTutor({
     // Auto-detect on both ends: the learner might reply in either
@@ -323,177 +341,127 @@ export function CommandCenter({ firstName, sessionMinutes, defaultMode = 'voice'
         Welcome back, {firstName}.
       </h1>
 
-      {/* Per-session mode toggle. Initial value comes from the profile;
-          flipping here doesn't change the saved default. */}
-      <button
-        type="button"
-        onClick={() => (mode === 'voice' ? router.push('/chat') : setMode('voice'))}
-        className="inline-flex items-center gap-1.5 rounded-full surface px-3 py-1 text-xs text-ink-200 hover:text-ink-50 hover:border-wise-500/40 transition"
-        title={
-          mode === 'voice'
-            ? 'Prefer typing? Open the text chat with Wise'
-            : 'Switch to voice — tap the orb and speak'
-        }
-      >
-        {mode === 'voice' ? (
-          <>
-            <Mic size={12} className="text-wise-300" aria-hidden />
-            <span>Voice mode</span>
-            <span className="opacity-60">· prefer typing? →</span>
-          </>
-        ) : (
-          <>
-            <MessageSquareText size={12} className="text-wise-300" aria-hidden />
-            <span>Text mode</span>
-            <span className="opacity-60">· tap to talk</span>
-          </>
-        )}
-      </button>
+      {/* Interface toggle — flips the home dashboard between the voice orb and
+          the text chat IN PLACE. The choice persists per-browser. */}
+      <div className="inline-flex items-center rounded-full surface p-0.5 text-xs">
+        <button
+          type="button"
+          onClick={() => switchMode('voice')}
+          aria-pressed={mode === 'voice'}
+          className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 transition ${
+            mode === 'voice' ? 'bg-wise-500 text-ink-900' : 'text-ink-200 hover:text-ink-50'
+          }`}
+        >
+          <Mic size={13} aria-hidden /> Voice
+        </button>
+        <button
+          type="button"
+          onClick={() => switchMode('text')}
+          aria-pressed={mode === 'text'}
+          className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 transition ${
+            mode === 'text' ? 'bg-wise-500 text-ink-900' : 'text-ink-200 hover:text-ink-50'
+          }`}
+        >
+          <MessageSquareText size={13} aria-hidden /> Chat
+        </button>
+      </div>
 
-      {/* Orb is always present — even text-mode users can tap to talk —
-          but in text mode it shrinks to make the chat the focus. */}
-      <VoiceOrb
-        state={pending ? 'thinking' : tutor.state}
-        size={mode === 'text' ? 'sm' : 'lg'}
-        amplitude={tutor.amplitude}
-        onTap={onOrbTap}
-      />
+      {mode === 'text' ? (
+        // Text chat fills the dashboard in place of the orb.
+        <div className="w-full h-[calc(100dvh-9.5rem)] min-h-[420px]">
+          <WiseChat firstName={firstName} />
+        </div>
+      ) : (
+        <>
+          {/* ── Voice interface ───────────────────────────────────────── */}
+          <VoiceOrb
+            state={pending ? 'thinking' : tutor.state}
+            size="lg"
+            amplitude={tutor.amplitude}
+            onTap={onOrbTap}
+          />
 
-      <div className="text-center min-h-[5rem] max-w-xl">
-        {wiseLine ? (
-          <div className="space-y-2">
-            <p className="font-display text-xl sm:text-2xl text-ink-50 animate-fade-up leading-snug">
-              {wiseLine}
-            </p>
-            {/* In text mode, give the learner an explicit way to hear
-                Wise's last line — bypasses the speak() no-op gate. */}
-            {mode === 'text' && (
-              <button
-                type="button"
-                onClick={() => void tutor.playOnce(wiseLine)}
-                className="inline-flex items-center gap-1.5 text-xs text-ink-300 hover:text-ink-50 transition"
-                aria-label="Listen to this"
-              >
-                <Volume2 size={12} aria-hidden /> Listen
-              </button>
+          <div className="text-center min-h-[5rem] max-w-xl">
+            {wiseLine ? (
+              <p className="font-display text-xl sm:text-2xl text-ink-50 animate-fade-up leading-snug">
+                {wiseLine}
+              </p>
+            ) : (
+              <p className="text-ink-200 text-sm">Loading…</p>
+            )}
+            {userLine && tutor.state !== 'listening' && (
+              <p className="mt-3 text-sm text-ink-200 italic animate-fade-up">
+                you: &ldquo;{userLine}&rdquo;
+              </p>
             )}
           </div>
-        ) : (
-          <p className="text-ink-200 text-sm">Loading…</p>
-        )}
-        {userLine && tutor.state !== 'listening' && (
-          <p className="mt-3 text-sm text-ink-200 italic animate-fade-up">
-            you: &ldquo;{userLine}&rdquo;
-          </p>
-        )}
-      </div>
 
-      {/* In text mode, the type-to-Wise input sits where voice users see
-          the status text. In voice mode it's hidden and the orb is the
-          primary control. */}
-      {mode === 'text' ? (
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            const t = textInput.trim();
-            if (!t || pending) return;
-            setUserLine(t);
-            setTextInput('');
-            await sendToWise(t);
-          }}
-          className="w-full max-w-xl flex gap-2 -mt-2"
-        >
-          <input
-            value={textInput}
-            onChange={(e) => setTextInput(e.target.value)}
-            placeholder="Type to Wise…"
-            disabled={pending}
-            enterKeyHint="send"
-            autoCapitalize="sentences"
-            className="flex-1 min-w-0"
-          />
-          <button
-            type="submit"
-            disabled={!textInput.trim() || pending}
-            className="rounded-full bg-wise-500 hover:bg-wise-600 disabled:opacity-50 text-ink-900 font-medium px-4 inline-flex items-center justify-center"
-            aria-label="Send"
-          >
-            <Send size={16} />
-          </button>
-        </form>
-      ) : (
-        <p className="text-xs text-ink-200 -mt-2">{statusText()}</p>
+          <p className="text-xs text-ink-200 -mt-2">{statusText()}</p>
+
+          {comeback && (
+            <button
+              onClick={startComebackLesson}
+              disabled={pending}
+              className="w-full max-w-xl text-left rounded-2xl p-5 sm:p-6 surface border-wise-500/40 text-ink-50 hover:border-wise-500/70 transition disabled:opacity-60"
+            >
+              <div className="text-[11px] uppercase tracking-[0.2em] text-wise-400">
+                Welcome back
+              </div>
+              <div className="font-display text-lg sm:text-xl mt-2">
+                {comeback.daysMissed === 1
+                  ? 'A short reset — pick up where you left off'
+                  : `It's been ${comeback.daysMissed} days. Quick warm-up to ease back in.`}
+              </div>
+              <div className="text-sm mt-1 text-ink-200">
+                ~{comeback.recommendedDurationMinutes} min · low pressure, recent vocab
+              </div>
+            </button>
+          )}
+
+          <div className="grid sm:grid-cols-2 gap-3 sm:gap-4 w-full max-w-xl">
+            <button
+              onClick={startMission}
+              disabled={pending}
+              className="text-left rounded-2xl p-5 sm:p-6 bg-wise-500 hover:bg-wise-600 active:bg-wise-700 text-ink-900 transition disabled:opacity-60"
+            >
+              <div className="text-[11px] uppercase tracking-[0.2em] opacity-80">
+                {immersionMode || languageRatio > 0.5 ? 'Inizia' : 'Start'}
+              </div>
+              <div className="font-display text-xl sm:text-2xl mt-2">Today&apos;s mission</div>
+              <div className="text-sm mt-1 opacity-90">~{sessionMinutes} min</div>
+            </button>
+            <a
+              href="/vocabulary/review"
+              className="text-left rounded-2xl p-5 sm:p-6 surface text-ink-50 hover:border-wise-500/40 transition"
+            >
+              <div className="text-[11px] uppercase tracking-[0.2em] text-ink-200">
+                {immersionMode || languageRatio > 0.5 ? 'Ripasso' : 'Review'}
+              </div>
+              <div className="font-display text-xl sm:text-2xl mt-2">
+                {dueCount > 0 ? `${dueCount} due` : 'All caught up'}
+              </div>
+              <div className="text-sm mt-1 text-ink-200">
+                {dueCount > 0 ? 'Quick wins for spaced repetition' : 'Come back tomorrow'}
+              </div>
+            </a>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 w-full max-w-xl text-sm">
+            <a
+              href="/talk"
+              className="text-center rounded-xl px-4 py-3 surface text-ink-100 hover:text-ink-50 hover:border-wise-500/40 transition"
+            >
+              Talk freely (voice)
+            </a>
+            <a
+              href="/lessons"
+              className="text-center rounded-xl px-4 py-3 surface text-ink-100 hover:text-ink-50 hover:border-wise-500/40 transition"
+            >
+              Past lessons
+            </a>
+          </div>
+        </>
       )}
-
-      {comeback && (
-        <button
-          onClick={startComebackLesson}
-          disabled={pending}
-          className="w-full max-w-xl text-left rounded-2xl p-5 sm:p-6 surface border-wise-500/40 text-ink-50 hover:border-wise-500/70 transition disabled:opacity-60"
-        >
-          <div className="text-[11px] uppercase tracking-[0.2em] text-wise-400">Welcome back</div>
-          <div className="font-display text-lg sm:text-xl mt-2">
-            {comeback.daysMissed === 1
-              ? 'A short reset — pick up where you left off'
-              : `It's been ${comeback.daysMissed} days. Quick warm-up to ease back in.`}
-          </div>
-          <div className="text-sm mt-1 text-ink-200">
-            ~{comeback.recommendedDurationMinutes} min · low pressure, recent vocab
-          </div>
-        </button>
-      )}
-
-      <div className="grid sm:grid-cols-2 gap-3 sm:gap-4 w-full max-w-xl">
-        <button
-          onClick={startMission}
-          disabled={pending}
-          className="text-left rounded-2xl p-5 sm:p-6 bg-wise-500 hover:bg-wise-600 active:bg-wise-700 text-ink-900 transition disabled:opacity-60"
-        >
-          <div className="text-[11px] uppercase tracking-[0.2em] opacity-80">
-            {immersionMode || languageRatio > 0.5 ? 'Inizia' : 'Start'}
-          </div>
-          <div className="font-display text-xl sm:text-2xl mt-2">Today&apos;s mission</div>
-          <div className="text-sm mt-1 opacity-90">~{sessionMinutes} min</div>
-        </button>
-        <a
-          href="/vocabulary/review"
-          className="text-left rounded-2xl p-5 sm:p-6 surface text-ink-50 hover:border-wise-500/40 transition"
-        >
-          <div className="text-[11px] uppercase tracking-[0.2em] text-ink-200">
-            {immersionMode || languageRatio > 0.5 ? 'Ripasso' : 'Review'}
-          </div>
-          <div className="font-display text-xl sm:text-2xl mt-2">
-            {dueCount > 0 ? `${dueCount} due` : 'All caught up'}
-          </div>
-          <div className="text-sm mt-1 text-ink-200">
-            {dueCount > 0 ? 'Quick wins for spaced repetition' : 'Come back tomorrow'}
-          </div>
-        </a>
-      </div>
-
-      {/* Text chat is the instant, no-latency way to talk with Wise — make it
-          a clear, primary entry alongside the voice orb. */}
-      <a
-        href="/chat"
-        className="w-full max-w-xl inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 surface border-wise-500/40 text-ink-50 hover:border-wise-500/70 transition text-sm font-medium"
-      >
-        <MessageSquareText size={16} className="text-wise-300" aria-hidden />
-        Chat with Wise — type instead of talk
-      </a>
-      <div className="grid grid-cols-2 gap-3 w-full max-w-xl text-sm">
-        <a
-          href="/talk"
-          className="text-center rounded-xl px-4 py-3 surface text-ink-100 hover:text-ink-50 hover:border-wise-500/40 transition"
-        >
-          Talk freely (voice)
-        </a>
-        <a
-          href="/lessons"
-          className="text-center rounded-xl px-4 py-3 surface text-ink-100 hover:text-ink-50 hover:border-wise-500/40 transition"
-        >
-          Past lessons
-        </a>
-      </div>
     </div>
   );
 }

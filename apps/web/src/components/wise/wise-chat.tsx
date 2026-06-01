@@ -173,7 +173,7 @@ export function WiseChat({ firstName }: { firstName: string }) {
   const onlyOpener = messages.length === 1;
 
   return (
-    <div className="mx-auto flex h-[calc(100dvh-3.5rem)] w-full max-w-2xl flex-col px-4">
+    <div className="mx-auto flex h-full w-full max-w-2xl flex-col px-0 sm:px-2">
       {/* messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 space-y-3">
         {messages.map((m, i) => {

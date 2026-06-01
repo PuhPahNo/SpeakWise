@@ -11,5 +11,9 @@ export default async function ChatPage() {
   const profile = await ensureProfile(user.id);
   if (!profile.onboardingCompleted) redirect('/onboarding');
   const firstName = user.name.split(' ')[0] ?? user.name;
-  return <WiseChat firstName={firstName} />;
+  return (
+    <div className="h-[calc(100dvh-3.5rem)]">
+      <WiseChat firstName={firstName} />
+    </div>
+  );
 }
