@@ -92,6 +92,13 @@ export function LessonPlayer({
   const [taskIndex, setTaskIndex] = useState(0);
   const [answer, setAnswer] = useState('');
   const [correction, setCorrection] = useState<CorrectionData | null>(null);
+  // Pronunciation coaching for voice answers on speaking tasks (null otherwise).
+  const [pronunciation, setPronunciation] = useState<{
+    tip: string;
+    soundsGood: boolean;
+    clarityScore: number;
+    issues: Array<{ sound: string; note: string }>;
+  } | null>(null);
   const [pending, setPending] = useState(false);
   const [showText, setShowText] = useState(false);
   const [xpEarned, setXpEarned] = useState<number | null>(null);
@@ -179,6 +186,7 @@ export function LessonPlayer({
   async function beginTask(idx: number) {
     setTaskIndex(idx);
     setCorrection(null);
+    setPronunciation(null);
     setAnswer('');
     setPhase('task');
     const t = tasks[idx];
@@ -273,11 +281,22 @@ export function LessonPlayer({
         retryPrompt: (c.retryPrompt as string) ?? null,
       };
       setCorrection(correctionPayload);
+      const pron =
+        (data.pronunciation as {
+          tip: string;
+          soundsGood: boolean;
+          clarityScore: number;
+          issues: Array<{ sound: string; note: string }>;
+        } | null) ?? null;
+      setPronunciation(pron);
       setPhase('correction');
 
-      const spoken = isCorrect
+      const base = isCorrect
         ? `${correctionPayload.encouragement ?? 'Nice.'} ${correctionPayload.explanation}`.trim()
         : `Not quite. ${correctionPayload.explanation} A better answer: ${correctionPayload.correctedAnswer}.`;
+      // Fold the pronunciation tip into what Wise says aloud so voice feedback
+      // actually coaches the learner's mouth, not just their grammar.
+      const spoken = pron?.tip ? `${base} Pronuncia: ${pron.tip}` : base;
       await tutor.speak(spoken, { autoListenAfter: false });
     } finally {
       setPending(false);
@@ -632,6 +651,27 @@ export function LessonPlayer({
               </div>
             )}
             <div className="mt-2 text-ink-200 text-sm">{correction.explanation}</div>
+            {pronunciation && (
+              <div className="mt-3 rounded-xl bg-ink-900/40 border hairline p-3">
+                <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-wise-400">
+                  <Volume2 size={13} aria-hidden="true" />
+                  Pronunciation
+                  <span className="text-ink-300 normal-case tracking-normal">
+                    {pronunciation.soundsGood ? '· sounds good' : '· worth a retry'}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm text-ink-100">{pronunciation.tip}</p>
+                {pronunciation.issues.length > 0 && (
+                  <ul className="mt-1.5 space-y-0.5">
+                    {pronunciation.issues.map((iss, i) => (
+                      <li key={i} className="text-xs text-ink-300">
+                        · <span className="text-ink-100">{iss.sound}</span> — {iss.note}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
             <button
               onClick={next}
               className="mt-4 w-full sm:w-auto rounded-full bg-wise-500 hover:bg-wise-600 text-ink-900 font-medium px-5 py-3"

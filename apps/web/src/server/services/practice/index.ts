@@ -42,7 +42,7 @@ export async function submitResponse(input: SubmitResponseInput) {
     vocabularyItemIds: task.vocabularyItemIds,
   });
 
-  const { correction, ai } = await evaluateUserResponse({
+  const { correction, ai, pronunciation } = await evaluateUserResponse({
     userId: input.userId,
     userResponseId: userResponse.id,
   });
@@ -54,6 +54,8 @@ export async function submitResponse(input: SubmitResponseInput) {
     userResponse,
     correction,
     correctionAi: ai,
+    // Pronunciation coaching for voice answers on speaking tasks (null otherwise).
+    pronunciation,
     nextTask,
   };
 }

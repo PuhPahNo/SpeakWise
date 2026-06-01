@@ -4,6 +4,7 @@ import { emitUserEvent } from '@speakwise/events';
 import { CorrectionOutputSchema } from '@speakwise/schemas';
 import { recordSkillEvidence } from '../progress';
 import { firstAcceptableDisplay, gradeObjective } from './objective-grader';
+import { assessPronunciation } from './pronunciation';
 
 export interface EvaluateInput {
   userId: string;
@@ -188,5 +189,28 @@ export async function evaluateUserResponse({
     ok: true,
   });
 
-  return { correction, ai };
+  // ── Pronunciation feedback (voice answers on speaking tasks) ─────────────
+  // Makes "voice-first" a coach, not just speak-instead-of-type. Best-effort:
+  // a failure never blocks the correction. Honest approximation (transcript +
+  // target-sound coaching), see ./pronunciation.ts.
+  let pronunciation: Awaited<ReturnType<typeof assessPronunciation>> = null;
+  const isSpeakingTask =
+    taskType === 'speaking_prompt' || taskType === 'translation' || taskType === 'roleplay';
+  if (ur.inputType === 'voice' && isSpeakingTask) {
+    const expectedText =
+      firstAcceptableDisplay(ur.lessonTask?.expectedAnswer) ?? ai.correctedAnswer ?? ur.userAnswer;
+    try {
+      pronunciation = await assessPronunciation({
+        userId,
+        expectedText,
+        heardText: ur.userAnswer,
+        level,
+      });
+    } catch (e) {
+      console.error('pronunciation assessment failed (non-blocking)', e);
+      pronunciation = null;
+    }
+  }
+
+  return { correction, ai, pronunciation };
 }

@@ -19,6 +19,8 @@ export async function POST(req: Request) {
     return {
       userResponse: result.userResponse,
       correction: result.correction,
+      // Pronunciation coaching (voice answers on speaking tasks); null otherwise.
+      pronunciation: result.pronunciation,
       nextTask: result.nextTask,
       progressSignals: result.userResponse.skillIds,
     };
