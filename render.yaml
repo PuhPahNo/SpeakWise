@@ -10,6 +10,7 @@ databases:
     databaseName: speakwise
     user: speakwise
     plan: basic-256mb
+    region: ohio
     postgresMajorVersion: 16
     ipAllowList: []
 
@@ -19,9 +20,11 @@ services:
     name: speakwise-web
     runtime: node
     plan: starter
-    region: oregon
-    rootDir: apps/web
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @speakwise/db prisma:generate && pnpm --filter speakwise-web build
+    region: ohio
+    # Install pnpm via npm (writable global prefix). `corepack enable` fails on
+    # Render's builder with EROFS because it tries to symlink into read-only
+    # /usr/bin. Build runs from the repo root so pnpm resolves the workspace.
+    buildCommand: npm install -g pnpm@9.12.0 && pnpm install --frozen-lockfile && pnpm --filter @speakwise/db prisma:generate && pnpm --filter speakwise-web build
     # Runs after build, before the new version goes live, with DB + env access.
     # No migrations in this repo — schema is applied via `prisma db push`; the
     # seed (curriculum + prompts) is idempotent. Both safe to run every deploy.
@@ -33,6 +36,10 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Pin Node — an open-ended engines range let Render pick a bleeding-edge
+      # Node (26.x). 22 is a stable LTS that Next 15 + Prisma 5 are tested on.
+      - key: NODE_VERSION
+        value: "22"
       - key: APP_URL
         sync: false
       - key: NEXT_PUBLIC_APP_URL
