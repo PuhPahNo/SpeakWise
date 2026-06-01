@@ -21,6 +21,12 @@ import cap10 from './cap-10-lessons';
 import cap11 from './cap-11-lessons';
 import cap12 from './cap-12-lessons';
 import cap13 from './cap-13-lessons';
+import cap14 from './cap-14-lessons';
+import cap15 from './cap-15-lessons';
+import cap16 from './cap-16-lessons';
+import cap17 from './cap-17-lessons';
+import cap18 from './cap-18-lessons';
+import cap19 from './cap-19-lessons';
 
 const modules: Array<{ unitCode: string; lessons: SeedLessonTemplate[] }> = [
   cap00,
@@ -37,6 +43,12 @@ const modules: Array<{ unitCode: string; lessons: SeedLessonTemplate[] }> = [
   cap11,
   cap12,
   cap13,
+  cap14,
+  cap15,
+  cap16,
+  cap17,
+  cap18,
+  cap19,
 ];
 
 export const extraLessonsByUnit: Record<string, SeedLessonTemplate[]> = {};
