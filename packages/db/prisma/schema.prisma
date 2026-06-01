@@ -305,6 +305,43 @@ model LearnerProfile {
   @@map("learner_profiles")
 }
 
+/// A book-aligned unit of the curriculum — one per Prego! chapter
+/// (Capitolo Preliminare, 1–18) plus an advanced/appendix unit. Groups the
+/// skills, lesson templates, and thematic vocabulary that belong together and
+/// gives the learner a navigable "course path." Skills remain the atomic unit
+/// the engine targets; the unit is the chapter wrapper around them.
+model CurriculumUnit {
+  id            String    @id @default(uuid()) @db.Uuid
+  language      String    @default("it")
+  /// Stable code, e.g. "cap-00" (Preliminare), "cap-01" … "cap-18", "appendix".
+  code          String    @unique
+  /// Position in the course path (0 = Preliminare).
+  order         Int
+  title         String
+  subtitle      String?
+  /// Primary interest theme the chapter is built around (maps to the learner
+  /// interest themes: travel, food, family, sports, music, politics …). The
+  /// personalization layer can still re-theme, but this is the native fit.
+  theme         String
+  level         CEFRLevel
+  summary       String    @db.Text
+  /// CEFR-style "can-do" statements the learner achieves by finishing the unit.
+  canDo         String[]  @default([]) @map("can_do")
+  /// Cultural notes for the chapter (Curiosità / L'Italia regionale style):
+  /// array of { title, body } objects. Drives culture tasks + readings.
+  culturalNotes Json      @default("[]") @map("cultural_notes")
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  skills          CurriculumSkill[]
+  lessonTemplates CurriculumLessonTemplate[]
+  vocabulary      CurriculumVocabulary[]
+
+  @@index([order])
+  @@map("curriculum_units")
+}
+
 model CurriculumSkill {
   id            String        @id @default(uuid()) @db.Uuid
   language      String        @default("it")
@@ -316,13 +353,37 @@ model CurriculumSkill {
   prerequisites String[]      @default([]) @db.Uuid
   examples      Json          @default("[]")
   isActive      Boolean       @default(true) @map("is_active")
+
+  // ─── Book-aligned content layer (Prego!-derived curriculum) ───────────────
+  /// The chapter/unit this skill belongs to. Null for legacy/cross-cutting
+  /// skills not yet mapped to a unit.
+  unitId        String?       @map("unit_id") @db.Uuid
+  /// Display order within the unit (chapter), so the course path renders in
+  /// the book's pedagogical sequence.
+  orderInUnit   Int?          @map("order_in_unit")
+  /// The classic learner errors for this skill. Fed to the lesson generator
+  /// so tasks deliberately probe these, and to the correction engine so it
+  /// recognizes them. e.g. "wrong auxiliary (avere vs essere)".
+  commonMistakes           String[]   @default([]) @map("common_mistakes")
+  /// Task types best suited to drilling this skill. Steers the lesson
+  /// generator's task mix toward what actually teaches this point.
+  recommendedPracticeTypes TaskType[] @default([]) @map("recommended_practice_types")
+  /// Interest themes this skill personalizes well into (food, travel,
+  /// politics …). Lets Wise theme the same grammar to the learner's interests.
+  compatibleThemes         String[]   @default([]) @map("compatible_themes")
+  /// Pedagogical notes for Wise: how to explain it, what to contrast it with,
+  /// what to avoid. Never shown raw to the learner — it shapes generation.
+  teachingNotes            String?    @db.Text @map("teaching_notes")
+
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
 
+  unit         CurriculumUnit?     @relation(fields: [unitId], references: [id], onDelete: SetNull)
   userProgress UserSkillProgress[]
 
   @@index([level])
   @@index([category])
+  @@index([unitId])
   @@map("curriculum_skills")
 }
 
@@ -357,6 +418,71 @@ model UserSkillProgress {
   @@index([userId, status])
   @@index([nextReviewAt])
   @@map("user_skill_progress")
+}
+
+/// A canonical, reusable lesson blueprint anchored to a unit (chapter). This
+/// is how "many lessons per chapter" lives as durable, authored content: each
+/// template defines an objective, a task arc, and which skills it exercises.
+/// The lesson engine personalizes a template into a concrete per-user Lesson
+/// (theming examples/scenarios to the learner's interests) rather than
+/// generating from scratch — so every chapter ships a structured set of
+/// lessons while staying personal. Templates are content, not per-user rows.
+model CurriculumLessonTemplate {
+  id                     String     @id @default(uuid()) @db.Uuid
+  unitId                 String     @map("unit_id") @db.Uuid
+  slug                   String     @unique
+  title                  String
+  lessonType             LessonType @map("lesson_type")
+  /// Order within the unit's lesson sequence.
+  order                  Int
+  level                  CEFRLevel
+  summary                String     @db.Text
+  /// Slugs of the CurriculumSkills this lesson is designed to teach/practice.
+  objectiveSkillSlugs    String[]   @default([]) @map("objective_skill_slugs")
+  /// Ordered array of task specs ({ taskType, focus, prompt, exampleAnswer,
+  /// notes }) the engine expands + personalizes into real LessonTasks.
+  taskBlueprint          Json       @default("[]") @map("task_blueprint")
+  defaultDurationMinutes Int        @default(10) @map("default_duration_minutes")
+  /// Interest themes this lesson personalizes well into.
+  compatibleThemes       String[]   @default([]) @map("compatible_themes")
+  isActive               Boolean    @default(true) @map("is_active")
+  createdAt              DateTime   @default(now()) @map("created_at")
+  updatedAt              DateTime   @updatedAt @map("updated_at")
+
+  unit CurriculumUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([unitId, order])
+  @@map("curriculum_lesson_templates")
+}
+
+/// Canonical thematic vocabulary for a unit (the Vocabolario preliminare of
+/// each chapter). Theme-tagged and ordered. When a learner reaches the unit,
+/// these are materialized into their personal VocabularyItem rows (with SRS
+/// scheduling). Keeping a canonical bank means vocab is authored once, stays
+/// consistent, and powers vocabulary_review lessons without per-user authoring.
+model CurriculumVocabulary {
+  id                 String   @id @default(uuid()) @db.Uuid
+  unitId             String   @map("unit_id") @db.Uuid
+  slug               String   @unique
+  targetText         String   @map("target_text")
+  nativeText         String   @map("native_text")
+  partOfSpeech       String?  @map("part_of_speech")
+  /// "m" | "f" | "m/f" | null — grammatical gender, drives article practice.
+  gender             String?
+  exampleSentence    String?  @map("example_sentence") @db.Text
+  exampleTranslation String?  @map("example_translation") @db.Text
+  /// Sub-theme tag within the chapter (e.g. "luoghi", "mezzi di trasporto").
+  theme              String?
+  /// "neutral" | "formal" | "informal" | "colloquial" — register hint.
+  register           String?
+  order              Int
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  unit CurriculumUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([unitId, order])
+  @@map("curriculum_vocabulary")
 }
 
 model VocabularyItem {

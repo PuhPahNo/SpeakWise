@@ -60,3 +60,7 @@ packages/db/prisma/migrations/dev.db*
 
 # Smoke test output
 scripts/.smoke-output.mp3
+
+# Source textbook (97MB, copyrighted reference — never commit)
+vdoc.pub_prego-an-invitation-to-italian.pdf
+*.pdf
