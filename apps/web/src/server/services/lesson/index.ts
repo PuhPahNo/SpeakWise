@@ -95,6 +95,25 @@ export async function generateLesson(input: GenerateLessonInput) {
 
   const memoryNotes = await listMemory(input.userId);
 
+  // Pull the chapter (unit) the target skills belong to so the generator can
+  // anchor the lesson in the book's thematic frame. The "primary" unit is the
+  // one the most target skills come from.
+  const unitIds = [
+    ...new Set(targetSkills.map((s) => s.unitId).filter((v): v is string => Boolean(v))),
+  ];
+  const units = unitIds.length
+    ? await prisma.curriculumUnit.findMany({
+        where: { id: { in: unitIds } },
+        select: { id: true, code: true, title: true, theme: true, canDo: true },
+      })
+    : [];
+  const primaryUnit =
+    units.length > 0
+      ? (units
+          .map((u) => ({ u, n: targetSkills.filter((s) => s.unitId === u.id).length }))
+          .sort((a, b) => b.n - a.n)[0]?.u ?? null)
+      : null;
+
   // The lesson generator needs the learner's languageRatio so the
   // briefing + task prompts blend Italian and English at the right
   // proportion (matches what Wise speaks elsewhere).
@@ -102,12 +121,25 @@ export async function generateLesson(input: GenerateLessonInput) {
     learner: profile,
     languageRatio: profile.languageRatio,
     immersionMode: profile.immersionMode,
+    // Rich per-skill pedagogy from the Prego!-aligned curriculum. commonMistakes
+    // tells the generator what errors to deliberately probe; teachingNotes is
+    // how to explain it; compatibleThemes are the interests this skill themes
+    // into well (the generator intersects these with the learner's interests).
     targetSkills: targetSkills.map((s) => ({
       slug: s.slug,
       name: s.name,
       level: s.level,
       category: s.category,
+      description: s.description,
+      commonMistakes: s.commonMistakes,
+      teachingNotes: s.teachingNotes,
+      compatibleThemes: s.compatibleThemes,
     })),
+    // The chapter this lesson sits in — gives Wise a coherent thematic anchor
+    // (e.g. "Caffè e cappuccino" / food) and the unit's can-do outcomes.
+    unit: primaryUnit
+      ? { title: primaryUnit.title, theme: primaryUnit.theme, canDo: primaryUnit.canDo }
+      : null,
     dueForReview: dueSkills.map((d) => ({ slug: d.skill.slug, name: d.skill.name })),
     recentMistakeSkills: recentMistakeSkills.map((s) => ({ slug: s.slug, name: s.name })),
     relevantMemory: memoryNotes.slice(0, 6).map((m) => ({

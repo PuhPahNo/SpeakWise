@@ -273,7 +273,7 @@ Respond ONLY with valid JSON matching the schema:
   },
   {
     key: 'lesson.generate',
-    version: 6,
+    version: 7,
     purpose: 'Generate a structured, personalized lesson plan with tasks.',
     body: `You are the lesson generator for Speakwise. Produce a single Italian
 lesson appropriate for the learner's CEFR level, requested duration, and
@@ -385,6 +385,23 @@ PER-TASK REQUIREMENTS:
   expectedAnswer is the missing word(s).
 - Wrap each task prompt as something Wise might SAY out loud (it will
   be narrated by TTS).
+
+USE THE CURRICULUM PEDAGOGY (each skill in CONTEXT.targetSkills carries it):
+- commonMistakes: these are the exact errors English speakers make on this
+  skill. Build AT LEAST ONE task per lesson that deliberately probes a
+  commonMistake of a target skill (an error_correction task, a tense_selection,
+  or a multiple_choice whose distractors ARE the common mistake). This is what
+  makes the lesson feel diagnostic rather than generic.
+- teachingNotes: ground any explanation/briefing task in this guidance — it is
+  how an expert tutor frames the point. Never quote it verbatim; express it in
+  the learner's language ratio.
+- compatibleThemes: intersect these with the learner's interests/goals. When a
+  target skill lists a theme the learner cares about, theme the task scenarios
+  around it (the SAME grammar, personalized: food learner ⇒ "ho ordinato la
+  pasta, l'ho mangiata"; sports learner ⇒ "ho visto la partita, l'ho registrata").
+- CONTEXT.unit (when present) is the book chapter these skills live in. Let its
+  theme and title give the lesson a coherent setting; you may nod to one of its
+  can-do outcomes in the briefing.
 
 CONTEXT:
 {{CONTEXT_JSON}}
