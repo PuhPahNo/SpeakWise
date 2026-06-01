@@ -825,3 +825,21 @@ enum DirectiveStatus {
   active
   archived
 }
+
+/// Dedup ledger for the in-process scheduler. Before running a scheduled job,
+/// the scheduler claims its time window by inserting (job, windowKey); the
+/// unique constraint means only one runner — across restarts or multiple
+/// instances — actually executes that window. Lets the cron logic live inside
+/// the web service instead of as separate Render cron services.
+model CronRun {
+  id        String   @id @default(uuid()) @db.Uuid
+  job       String
+  /// Identifies the schedule window, e.g. "2026-06-01" (daily) or
+  /// "2026-06-01T14" (hourly, UTC).
+  windowKey String   @map("window_key")
+  ranAt     DateTime @default(now()) @map("ran_at")
+  result    Json?
+
+  @@unique([job, windowKey])
+  @@map("cron_runs")
+}

@@ -1,7 +1,9 @@
 # Render Blueprint — Speakwise.
 # Apply via: https://dashboard.render.com/blueprints → New Blueprint Instance.
-# Render will create the Postgres + Web Service + Cron Jobs and prompt for any
-# environment variables marked sync:false.
+# Render creates ONE Postgres + ONE Web Service and prompts for any environment
+# variables marked sync:false. Scheduled work (review/comeback offers, memory
+# extraction) runs INSIDE the web service via an in-process scheduler
+# (apps/web/src/instrumentation.ts), so there are no separate cron services.
 
 databases:
   - name: speakwise-db
@@ -20,6 +22,10 @@ services:
     region: oregon
     rootDir: apps/web
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @speakwise/db prisma:generate && pnpm --filter speakwise-web build
+    # Runs after build, before the new version goes live, with DB + env access.
+    # No migrations in this repo — schema is applied via `prisma db push`; the
+    # seed (curriculum + prompts) is idempotent. Both safe to run every deploy.
+    preDeployCommand: pnpm --filter @speakwise/db exec prisma db push && pnpm --filter @speakwise/db exec tsx src/seed.ts
     startCommand: pnpm --filter speakwise-web start
     healthCheckPath: /api/health
     autoDeploy: true
@@ -67,49 +73,7 @@ services:
         sync: false
       - key: NEXT_PUBLIC_POSTHOG_HOST
         value: https://us.i.posthog.com
+      # Still used to protect the /api/cron/* endpoints for manual/forced runs.
+      # The in-process scheduler calls the job logic directly (no HTTP, no secret).
       - key: CRON_SECRET
         generateValue: true
-
-  # ── Cron: nightly review scheduling + comeback offers ────────────────
-  - type: cron
-    name: speakwise-cron-nightly
-    runtime: node
-    plan: starter
-    region: oregon
-    rootDir: apps/web
-    schedule: "15 7 * * *"  # 07:15 UTC daily
-    buildCommand: corepack enable && pnpm install --frozen-lockfile
-    startCommand: |
-      curl -fsS -X POST \
-        -H "Authorization: Bearer $CRON_SECRET" \
-        "$APP_URL/api/cron/nightly"
-    envVars:
-      - key: APP_URL
-        sync: false
-      - key: CRON_SECRET
-        fromService:
-          type: web
-          name: speakwise-web
-          envVarKey: CRON_SECRET
-
-  # ── Cron: hourly memory extraction batch ─────────────────────────────
-  - type: cron
-    name: speakwise-cron-memory
-    runtime: node
-    plan: starter
-    region: oregon
-    rootDir: apps/web
-    schedule: "0 * * * *"  # top of every hour
-    buildCommand: corepack enable && pnpm install --frozen-lockfile
-    startCommand: |
-      curl -fsS -X POST \
-        -H "Authorization: Bearer $CRON_SECRET" \
-        "$APP_URL/api/cron/memory-extract"
-    envVars:
-      - key: APP_URL
-        sync: false
-      - key: CRON_SECRET
-        fromService:
-          type: web
-          name: speakwise-web
-          envVarKey: CRON_SECRET

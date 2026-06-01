@@ -1,28 +1,16 @@
-import { offerComebackIfNeeded } from '@/server/services/gamification';
-import { prisma } from '@speakwise/db';
+import { runNightly } from '@/server/services/cron/jobs';
 import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-function checkCronAuth(req: Request) {
-  const auth = req.headers.get('authorization') ?? '';
-  return auth === `Bearer ${process.env.CRON_SECRET}`;
-}
-
+// Scheduled in-process (see src/instrumentation.ts). This endpoint stays for
+// manual/forced runs and external triggers; it runs the same logic WITHOUT the
+// scheduler's dedup guard, so a human can re-run a window on demand.
 export async function POST(req: Request) {
-  if (!checkCronAuth(req)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
-
-  const users = await prisma.user.findMany({
-    select: { id: true },
-    where: { role: 'learner' },
-  });
-
-  const offers: Array<{ userId: string; offer: unknown }> = [];
-  for (const u of users) {
-    const offer = await offerComebackIfNeeded(u.id);
-    if (offer) offers.push({ userId: u.id, offer });
+  if (req.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   }
-
-  return NextResponse.json({ ok: true, processed: users.length, offers: offers.length });
+  const result = await runNightly();
+  return NextResponse.json({ ok: true, ...result });
 }
