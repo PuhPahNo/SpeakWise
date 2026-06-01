@@ -18,6 +18,22 @@ export const TaskTypeEnum = z.enum([
   'reflection',
 ]);
 
+// The lesson generator occasionally emits a LESSON-type string where a TASK
+// type belongs (most commonly "scenario_roleplay", which is a LessonType). One
+// stray enum value shouldn't 502 an otherwise-valid lesson, so we map the known
+// leaks to their nearest task type before validating.
+const TASK_TYPE_ALIASES: Record<string, string> = {
+  scenario_roleplay: 'roleplay',
+  speaking_challenge: 'speaking_prompt',
+  listening_challenge: 'listening_comprehension',
+  vocabulary_review: 'recap',
+  grammar: 'explanation',
+};
+export const TaskTypeLenient = z.preprocess(
+  (v) => (typeof v === 'string' && v in TASK_TYPE_ALIASES ? TASK_TYPE_ALIASES[v] : v),
+  TaskTypeEnum,
+);
+
 export const LessonTypeEnum = z.enum([
   'daily_mission',
   'recovery',
@@ -87,7 +103,7 @@ export const LessonGenerationOutputSchema = z.object({
   tasks: z
     .array(
       z.object({
-        taskType: TaskTypeEnum,
+        taskType: TaskTypeLenient,
         prompt: z.string().min(1),
         // The model often returns options as plain strings instead of
         // {value,label} pairs, so accept both shapes and normalize at

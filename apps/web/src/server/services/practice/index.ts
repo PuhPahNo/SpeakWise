@@ -50,8 +50,17 @@ export async function submitResponse(input: SubmitResponseInput) {
   // Find next task
   const nextTask = session.lesson?.tasks.find((t) => t.orderIndex === task.orderIndex + 1) ?? null;
 
+  // `userResponse` above is the row as CREATED — before evaluateUserResponse
+  // updates it with the verdict. Reflect the (deterministic-override-corrected)
+  // verdict from `ai` onto the object we return, or the client sees isCorrect=null
+  // and renders every answer as "Not quite".
   return {
-    userResponse,
+    userResponse: {
+      ...userResponse,
+      isCorrect: ai.isCorrect,
+      correctedAnswer: ai.correctedAnswer,
+      feedback: ai.explanation,
+    },
     correction,
     correctionAi: ai,
     // Pronunciation coaching for voice answers on speaking tasks (null otherwise).
