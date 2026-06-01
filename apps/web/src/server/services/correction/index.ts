@@ -3,6 +3,7 @@ import { prisma } from '@speakwise/db';
 import { emitUserEvent } from '@speakwise/events';
 import { CorrectionOutputSchema } from '@speakwise/schemas';
 import { recordSkillEvidence } from '../progress';
+import { firstAcceptableDisplay, gradeObjective } from './objective-grader';
 
 export interface EvaluateInput {
   userId: string;
@@ -68,6 +69,43 @@ export async function evaluateUserResponse({
     },
   });
   const ai = result.data;
+
+  // ── Deterministic override for objective tasks ───────────────────────────
+  // For task types with a knowable answer, a normalized match is the source of
+  // truth — not the LLM. This kills the two failure modes that quietly teach a
+  // no-tutor learner the wrong thing: being marked wrong on an exactly-correct
+  // answer, and being marked right on a wrong one. When the deterministic
+  // verdict disagrees with the model, we override AND reconcile the text so the
+  // explanation never contradicts the verdict. When they agree, we keep the
+  // model's richer, personalized wording.
+  const verdict = ur.lessonTask
+    ? gradeObjective({
+        taskType: ur.lessonTask.taskType,
+        expectedAnswer: ur.lessonTask.expectedAnswer,
+        options: ur.lessonTask.options,
+        answer: ur.userAnswer,
+      })
+    : null;
+  if (verdict && verdict.correct !== ai.isCorrect) {
+    if (verdict.correct) {
+      ai.isCorrect = true;
+      ai.score = Math.max(Number(ai.score) || 0, 0.95);
+      ai.mistakeType = null;
+      ai.severity = null;
+      ai.retryPrompt = null;
+      ai.correctedAnswer = ur.userAnswer;
+      ai.encouragement = 'Esatto! That’s exactly right.';
+      ai.explanation = 'Your answer matches — well done.';
+    } else {
+      const expected = firstAcceptableDisplay(ur.lessonTask?.expectedAnswer);
+      ai.isCorrect = false;
+      ai.score = Math.min(Number(ai.score) || 0, 0.2);
+      if (expected) {
+        ai.correctedAnswer = expected;
+        ai.explanation = `Not quite — the answer here is “${expected}”.`;
+      }
+    }
+  }
 
   // When the answer is correct, the model returns null for mistakeType /
   // severity (no mistake to classify). The Correction row still anchors
