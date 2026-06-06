@@ -17,6 +17,8 @@ interface Turn {
 export default function OnboardingPage() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>('voice');
+  // Optimistically voice; flipped to chat on mount if TTS can't run server-side.
+  const [voiceAvailable, setVoiceAvailable] = useState(true);
   const [phase, setPhase] = useState<Phase>('intro');
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [wiseLine, setWiseLine] = useState<string>('');
@@ -150,6 +152,7 @@ export default function OnboardingPage() {
   }
 
   function switchMode(m: Mode) {
+    if (m === 'voice' && !voiceAvailable) return; // voice disabled — no-op
     setMode(m);
     if (m === 'text') {
       // Silence any in-flight audio and make sure a session exists so the
@@ -158,6 +161,28 @@ export default function OnboardingPage() {
       void startText();
     }
   }
+
+  // On mount, check whether voice actually works from the server (paid
+  // ElevenLabs). If not, disable voice and start onboarding in chat — the
+  // free-tier orb would otherwise hang silently.
+  const availCheckedRef = useRef(false);
+  useEffect(() => {
+    if (availCheckedRef.current) return;
+    availCheckedRef.current = true;
+    void (async () => {
+      try {
+        const res = await fetch('/api/voice/availability');
+        if (!res.ok) return;
+        const { available } = (await res.json()) as { available: boolean };
+        if (!available) {
+          setVoiceAvailable(false);
+          switchMode('text');
+        }
+      } catch {
+        /* leave voice optimistic on a network blip */
+      }
+    })();
+  }, []);
 
   async function sendResponse(text: string, via: Mode, sid: string | null = sessionId) {
     if (!sid) return;
@@ -252,10 +277,10 @@ export default function OnboardingPage() {
             ? 'Interrupt Wise'
             : 'Tap to speak';
 
-  const segBtn = (active: boolean) =>
+  const segBtn = (active: boolean, disabled = false) =>
     `inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 transition ${
       active ? 'bg-wise-500 text-ink-900' : 'text-ink-200 hover:text-ink-50'
-    }`;
+    } ${disabled ? 'cursor-not-allowed opacity-40 hover:text-ink-200' : ''}`;
 
   return (
     <div className="min-h-[calc(100vh-4rem)] flex flex-col px-4 py-6 sm:py-10 max-w-2xl mx-auto">
@@ -269,8 +294,10 @@ export default function OnboardingPage() {
             <button
               type="button"
               onClick={() => switchMode('voice')}
+              disabled={!voiceAvailable}
               aria-pressed={mode === 'voice'}
-              className={segBtn(mode === 'voice')}
+              title={voiceAvailable ? undefined : 'Voice needs an ElevenLabs plan upgrade'}
+              className={segBtn(mode === 'voice', !voiceAvailable)}
             >
               <Mic size={13} aria-hidden /> Voice
             </button>

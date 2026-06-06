@@ -13,6 +13,9 @@ interface Props {
   sessionMinutes: number;
   /** From LearnerProfile.preferredInteractionMode; user can flip per-session. */
   defaultMode?: 'voice' | 'text';
+  /** Whether ElevenLabs TTS works from the server (paid plan). When false,
+   *  voice is disabled and we stay in chat. */
+  voiceAvailable?: boolean;
 }
 
 interface WiseTurn {
@@ -48,7 +51,12 @@ interface ComebackResponse {
   offer: { daysMissed: number; recommendedDurationMinutes: number; reason: string } | null;
 }
 
-export function CommandCenter({ firstName, sessionMinutes, defaultMode = 'voice' }: Props) {
+export function CommandCenter({
+  firstName,
+  sessionMinutes,
+  defaultMode = 'voice',
+  voiceAvailable = true,
+}: Props) {
   const router = useRouter();
   const toast = useToast();
   const [greeting, setGreeting] = useState<GreetingResponse | null>(null);
@@ -76,14 +84,21 @@ export function CommandCenter({ firstName, sessionMinutes, defaultMode = 'voice'
   // Remember the chosen interface across visits (per-browser). Initialized
   // from the profile default; the segmented toggle below persists changes.
   useEffect(() => {
+    // When voice can't work from the server, force chat and ignore any stale
+    // 'voice' choice in storage — otherwise the orb would silently fail.
+    if (!voiceAvailable) {
+      setMode('text');
+      return;
+    }
     try {
       const saved = localStorage.getItem('sw:homeMode');
       if (saved === 'voice' || saved === 'text') setMode(saved);
     } catch {
       /* private mode / no storage — keep the profile default */
     }
-  }, []);
+  }, [voiceAvailable]);
   const switchMode = (m: 'voice' | 'text') => {
+    if (m === 'voice' && !voiceAvailable) return; // voice disabled — no-op
     setMode(m);
     try {
       localStorage.setItem('sw:homeMode', m);
@@ -364,28 +379,39 @@ export function CommandCenter({ firstName, sessionMinutes, defaultMode = 'voice'
       </h1>
 
       {/* Interface toggle — flips the home dashboard between the voice orb and
-          the text chat IN PLACE. The choice persists per-browser. */}
-      <div className="inline-flex items-center rounded-full surface p-0.5 text-xs">
-        <button
-          type="button"
-          onClick={() => switchMode('voice')}
-          aria-pressed={mode === 'voice'}
-          className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 transition ${
-            mode === 'voice' ? 'bg-wise-500 text-ink-900' : 'text-ink-200 hover:text-ink-50'
-          }`}
-        >
-          <Mic size={13} aria-hidden /> Voice
-        </button>
-        <button
-          type="button"
-          onClick={() => switchMode('text')}
-          aria-pressed={mode === 'text'}
-          className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 transition ${
-            mode === 'text' ? 'bg-wise-500 text-ink-900' : 'text-ink-200 hover:text-ink-50'
-          }`}
-        >
-          <MessageSquareText size={13} aria-hidden /> Chat
-        </button>
+          the text chat IN PLACE. The choice persists per-browser. Voice is
+          disabled (and we stay in chat) when ElevenLabs TTS can't run from the
+          server; it auto-enables once the plan is upgraded. */}
+      <div className="flex flex-col items-center gap-1.5">
+        <div className="inline-flex items-center rounded-full surface p-0.5 text-xs">
+          <button
+            type="button"
+            onClick={() => switchMode('voice')}
+            disabled={!voiceAvailable}
+            aria-pressed={mode === 'voice'}
+            title={voiceAvailable ? undefined : 'Voice needs an ElevenLabs plan upgrade'}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 transition ${
+              mode === 'voice' ? 'bg-wise-500 text-ink-900' : 'text-ink-200 hover:text-ink-50'
+            } ${voiceAvailable ? '' : 'cursor-not-allowed opacity-40 hover:text-ink-200'}`}
+          >
+            <Mic size={13} aria-hidden /> Voice
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMode('text')}
+            aria-pressed={mode === 'text'}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 transition ${
+              mode === 'text' ? 'bg-wise-500 text-ink-900' : 'text-ink-200 hover:text-ink-50'
+            }`}
+          >
+            <MessageSquareText size={13} aria-hidden /> Chat
+          </button>
+        </div>
+        {!voiceAvailable && (
+          <p className="text-[11px] text-ink-300">
+            Voice is off — upgrade ElevenLabs to enable it.
+          </p>
+        )}
       </div>
 
       {mode === 'text' ? (

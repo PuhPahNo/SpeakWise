@@ -107,6 +107,53 @@ function estimateDuration(text: string): number {
   return Math.max(1, Math.round((wordCount / 150) * 60));
 }
 
+export interface TtsAvailability {
+  /** True when TTS will actually work from this server (paid plan). */
+  available: boolean;
+  /** ElevenLabs subscription tier, e.g. 'free' | 'starter' | 'creator'. */
+  tier: string | null;
+  reason: 'paid' | 'free_tier_blocked' | 'no_key' | 'error';
+}
+
+// ElevenLabs FREE tier returns 401 "detected_unusual_activity" when called
+// from a datacenter IP (Render). Paid tiers don't. So `tier !== 'free'` is a
+// reliable proxy for "voice will work in production". We cache the result
+// in-process (single Render instance) so we don't hit /v1/user on every page
+// load; the short TTL means an upgrade is reflected within ~10 minutes.
+let _ttsAvailCache: { value: TtsAvailability; at: number } | null = null;
+const TTS_AVAIL_TTL_MS = 10 * 60_000;
+
+export async function getTtsAvailability(opts?: {
+  forceRefresh?: boolean;
+}): Promise<TtsAvailability> {
+  const now = Date.now();
+  if (!opts?.forceRefresh && _ttsAvailCache && now - _ttsAvailCache.at < TTS_AVAIL_TTL_MS) {
+    return _ttsAvailCache.value;
+  }
+  const cache = (value: TtsAvailability): TtsAvailability => {
+    _ttsAvailCache = { value, at: now };
+    return value;
+  };
+
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) return cache({ available: false, tier: null, reason: 'no_key' });
+
+  try {
+    const res = await fetch('https://api.elevenlabs.io/v1/user', {
+      headers: { 'xi-api-key': apiKey },
+    });
+    if (!res.ok) return cache({ available: false, tier: null, reason: 'error' });
+    const data = (await res.json()) as { subscription?: { tier?: string } };
+    const tier = data.subscription?.tier ?? null;
+    const available = !!tier && tier !== 'free';
+    return cache({ available, tier, reason: available ? 'paid' : 'free_tier_blocked' });
+  } catch {
+    // Network blip — fail closed to text so we never push a broken voice
+    // experience. Short TTL means we re-check soon.
+    return cache({ available: false, tier: null, reason: 'error' });
+  }
+}
+
 interface TtsRawInput {
   voiceId: string;
   text: string;

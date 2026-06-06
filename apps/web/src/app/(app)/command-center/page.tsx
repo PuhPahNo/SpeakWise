@@ -1,6 +1,7 @@
 import { CommandCenter } from '@/components/wise/command-center';
 import { getOrCreateUser } from '@/lib/auth/current-user';
 import { ensureProfile } from '@/server/services/profile';
+import { getTtsAvailability } from '@speakwise/ai';
 import { redirect } from 'next/navigation';
 
 export default async function CommandCenterPage() {
@@ -13,12 +14,21 @@ export default async function CommandCenterPage() {
 
   const firstName = user.name.split(' ')[0] ?? user.name;
 
+  // Default-mode rule:
+  //   - User explicitly prefers chat → always chat.
+  //   - Else voice if it actually works from the server (paid ElevenLabs),
+  //     otherwise chat (free-tier TTS is blocked from Render's IP).
+  const voice = await getTtsAvailability();
+  const prefersText = profile.preferredInteractionMode === 'text';
+  const defaultMode: 'voice' | 'text' = prefersText || !voice.available ? 'text' : 'voice';
+
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
       <CommandCenter
         firstName={firstName}
         sessionMinutes={profile.preferredSessionLengthMinutes ?? 10}
-        defaultMode={profile.preferredInteractionMode === 'text' ? 'text' : 'voice'}
+        defaultMode={defaultMode}
+        voiceAvailable={voice.available}
       />
     </div>
   );
