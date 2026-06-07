@@ -1,7 +1,7 @@
 'use client';
 
 import type { VoiceState } from '@speakwise/types';
-import { useMemo } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface Props {
   state: VoiceState;
@@ -12,6 +12,7 @@ interface Props {
   amplitude?: number;
 }
 
+// Square footprints — the waveform draws a centered particle field inside.
 const SIZE: Record<NonNullable<Props['size']>, string> = {
   sm: 'h-24 w-24',
   md: 'h-40 w-40',
@@ -19,103 +20,216 @@ const SIZE: Record<NonNullable<Props['size']>, string> = {
   xl: 'h-72 w-72 sm:h-80 sm:w-80',
 };
 
-export function VoiceOrb({ state, size = 'lg', onTap, ariaLabel, amplitude = 0 }: Props) {
-  // The orb only animates during ACTIVE states. At rest, it's perfectly
-  // still — making it a reliable click target. The previous breathe-on-
-  // idle made the hit target jitter (~2px every 2s) AND made Playwright
-  // and real users miss clicks against the moving disc.
-  const animation = useMemo(() => {
-    switch (state) {
-      case 'listening':
-        return 'animate-orb-pulse';
-      case 'thinking':
-      case 'processing_transcription':
-        return 'animate-orb-spin-slow';
-      case 'speaking':
-        return 'animate-orb-breathe';
-      default:
-        return ''; // idle, paused, awaiting_user_response, error → still
+// Resolve a CSS color expression (var(--accent) / oklch(...)) to rgb() so the
+// canvas alpha helper can parse it — paint onto a 1×1 canvas and read it back.
+function makeResolver() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 1;
+  const cx = c.getContext('2d');
+  return (expr: string): string => {
+    const probe = document.createElement('span');
+    probe.style.color = expr;
+    probe.style.display = 'none';
+    document.body.appendChild(probe);
+    const resolved = getComputedStyle(probe).color;
+    probe.remove();
+    try {
+      if (!cx) return 'rgb(120,210,230)';
+      cx.clearRect(0, 0, 1, 1);
+      cx.fillStyle = '#000';
+      cx.fillStyle = resolved || expr;
+      cx.fillRect(0, 0, 1, 1);
+      const d = cx.getImageData(0, 0, 1, 1).data;
+      return `rgb(${d[0] ?? 0},${d[1] ?? 0},${d[2] ?? 0})`;
+    } catch {
+      return 'rgb(120,210,230)';
     }
-  }, [state]);
+  };
+}
 
-  const isError = state === 'error';
+function withAlpha(rgb: string, a: number): string {
+  const m = rgb.match(/rgba?\(([^)]+)\)/);
+  if (!m?.[1]) return rgb;
+  const p = m[1].split(',').map((s) => Number.parseFloat(s));
+  return `rgba(${p[0] ?? 0},${p[1] ?? 0},${p[2] ?? 0},${a})`;
+}
+
+/**
+ * Brina "voice presence" — an abstract reactive particle/constellation field
+ * that replaces the old gold sphere. Reacts to the voice state (and live mic
+ * amplitude while listening). Canvas-rendered; the whole footprint is the tap
+ * target. Prop interface is unchanged so all callers keep working.
+ */
+export function VoiceOrb({ state, size = 'lg', onTap, ariaLabel, amplitude = 0 }: Props) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const stateRef = useRef(state);
+  const ampRef = useRef(amplitude);
+  stateRef.current = state;
+  ampRef.current = amplitude;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const resolve = makeResolver();
+    const colors = {
+      a: resolve('var(--accent)'),
+      b: resolve('var(--accent-2)'),
+      err: 'rgb(220,90,90)',
+    };
+
+    let raf = 0;
+    let t = 0;
+    let energy = 0.12;
+    let rot = 0;
+
+    function resize() {
+      if (!canvas) return;
+      const r = canvas.getBoundingClientRect();
+      canvas.width = Math.max(1, r.width * dpr);
+      canvas.height = Math.max(1, r.height * dpr);
+    }
+    resize();
+    const ro = new ResizeObserver(() => {
+      resize();
+      draw();
+    });
+    ro.observe(canvas);
+
+    const N = 64;
+    const parts = Array.from({ length: N }, (_, i) => {
+      const ang = (i / N) * Math.PI * 2;
+      const ringBias = 0.55 + (i % 3) * 0.14;
+      // Deterministic-ish seed by index so SSR/CSR don't diverge visually.
+      const seed = (i * 1.6180339887) % 6.28;
+      return { ang, baseR: ringBias, seed, spd: 0.6 + ((i * 7) % 9) / 10 };
+    });
+
+    function targetEnergy(): number {
+      switch (stateRef.current) {
+        case 'listening':
+          return Math.min(0.95, 0.45 + ampRef.current * 0.5);
+        case 'thinking':
+        case 'processing_transcription':
+          return 0.4;
+        case 'speaking':
+          return 0.85;
+        default:
+          return 0.3;
+      }
+    }
+    function envelope(): number {
+      const s = stateRef.current;
+      if (s === 'speaking')
+        return (
+          0.55 +
+          0.45 *
+            Math.abs(Math.sin(t * 7.3) * 0.6 + Math.sin(t * 12.7) * 0.3 + Math.sin(t * 19.1) * 0.2)
+        );
+      if (s === 'listening')
+        return 0.5 + 0.5 * Math.abs(Math.sin(t * 3.1) + Math.sin(t * 5.7) * 0.5) * 0.6;
+      if (s === 'thinking' || s === 'processing_transcription')
+        return 0.5 + 0.3 * Math.sin(t * 2.2);
+      return 0.5 + 0.12 * Math.sin(t * 0.9);
+    }
+
+    function draw() {
+      if (!canvas || !ctx) return;
+      const tgt = targetEnergy();
+      energy += (tgt - energy) * 0.06;
+      const env = envelope();
+      const amp = energy * env;
+      rot += (stateRef.current === 'thinking' ? 0.012 : 0.0025) + energy * 0.006;
+
+      const W = canvas.width;
+      const H = canvas.height;
+      const cx = W / 2;
+      const cy = H / 2;
+      const R = Math.min(W, H) * 0.4;
+      const isErr = stateRef.current === 'error';
+      const a = isErr ? colors.err : colors.a;
+      const b = isErr ? colors.err : colors.b;
+
+      ctx.clearRect(0, 0, W, H);
+      ctx.lineCap = 'round';
+
+      // soft central glow
+      const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * (1.1 + amp * 0.5));
+      glow.addColorStop(0, withAlpha(a, 0.28 + amp * 0.28));
+      glow.addColorStop(0.45, withAlpha(a, 0.1));
+      glow.addColorStop(1, withAlpha(a, 0));
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, W, H);
+
+      // constellation field — dots oscillate radially + faint links
+      const pts = parts.map((p) => {
+        const wob = Math.sin(t * p.spd * 2 + p.seed) * 0.5 + 0.5;
+        const rr = R * (p.baseR + amp * 0.5 * wob);
+        const ang = p.ang + rot * (0.4 + p.baseR);
+        return {
+          x: cx + Math.cos(ang) * rr,
+          y: cy + Math.sin(ang) * rr,
+          r: (1.3 + wob * 2.4 + amp * 2) * dpr,
+        };
+      });
+      ctx.lineWidth = 1 * dpr;
+      for (let i = 0; i < pts.length; i++) {
+        const pi = pts[i];
+        if (!pi) continue;
+        for (let j = i + 1; j < i + 4 && j < pts.length; j++) {
+          const pj = pts[j];
+          if (!pj) continue;
+          const dx = pi.x - pj.x;
+          const dy = pi.y - pj.y;
+          const d = Math.hypot(dx, dy);
+          if (d < R * 0.5) {
+            ctx.strokeStyle = withAlpha(b, (1 - d / (R * 0.5)) * 0.22 * (0.4 + amp));
+            ctx.beginPath();
+            ctx.moveTo(pi.x, pi.y);
+            ctx.lineTo(pj.x, pj.y);
+            ctx.stroke();
+          }
+        }
+      }
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i];
+        if (!p) continue;
+        ctx.fillStyle = withAlpha(i % 4 === 0 ? b : a, 0.85);
+        ctx.shadowColor = withAlpha(a, 0.7);
+        ctx.shadowBlur = 8 * dpr;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+    }
+
+    function loop() {
+      t += 0.016;
+      draw();
+      raf = requestAnimationFrame(loop);
+    }
+    loop();
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+  }, []);
+
   const interactive = !!onTap;
-
-  // Dynamic outer glow scales with mic amplitude when listening
-  const dynamicGlow = state === 'listening' ? Math.max(0, Math.min(1, amplitude)) : 0;
-
-  // Wrap the button in a slightly larger flex container so we can render
-  // halos as siblings WITHOUT them blocking the click. The halos use
-  // `pointer-events: none` so 100% of taps in the orb area hit the button.
   return (
-    <div
-      className={`relative inline-flex items-center justify-center ${
-        interactive ? 'cursor-pointer' : ''
-      }`}
+    <button
+      type="button"
+      onClick={onTap}
+      disabled={!onTap}
+      aria-label={ariaLabel ?? `Voice presence, ${state.replace(/_/g, ' ')}`}
+      className={`relative ${SIZE[size]} max-w-full rounded-full bg-transparent p-0 transition-transform duration-150 ${
+        interactive ? 'cursor-pointer active:scale-[0.98]' : 'cursor-default'
+      } focus:outline-none focus-visible:outline-none`}
     >
-      {/* Outer halo rings — purely decorative, never receive clicks */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 rounded-full transition-all duration-150"
-        style={{
-          transform: `scale(${1.15 + dynamicGlow * 0.25})`,
-          background: isError
-            ? 'radial-gradient(circle, rgba(220,38,38,0.30), transparent 70%)'
-            : 'radial-gradient(circle, rgba(224,136,24,0.25), transparent 70%)',
-          opacity: isError ? 0.6 : state === 'listening' ? 0.7 + dynamicGlow * 0.3 : 0.3,
-        }}
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 rounded-full"
-        style={{
-          transform: `scale(${1.35 + dynamicGlow * 0.4})`,
-          background: isError
-            ? 'radial-gradient(circle, rgba(220,38,38,0.12), transparent 70%)'
-            : 'radial-gradient(circle, rgba(224,136,24,0.10), transparent 70%)',
-          opacity: isError ? 0.4 : state === 'listening' ? 0.6 : 0.2,
-          transition: 'all 200ms ease-out',
-        }}
-      />
-
-      {/* The actual click target — the visible orb plus a generous invisible
-          padding ring. The :active state gives instant tactile feedback so
-          the user feels the tap register before any network round-trip. */}
-      <button
-        type="button"
-        onClick={onTap}
-        disabled={!onTap}
-        aria-label={ariaLabel ?? `Voice orb, ${state.replace(/_/g, ' ')}`}
-        className={`relative ${SIZE[size]} rounded-full ${animation} ${
-          interactive ? 'cursor-pointer hover:brightness-110 active:scale-[0.97]' : 'cursor-default'
-        } ${isError ? '' : 'shadow-orb-glow'} focus:outline-none focus-visible:shadow-orb-glow-active transition-[transform,filter,box-shadow] duration-150`}
-        style={{
-          background: isError
-            ? 'radial-gradient(circle at 32% 28%, rgba(120,40,40,0.85), rgba(70,20,20,0.95) 60%, rgba(30,10,10,1) 100%)'
-            : 'radial-gradient(circle at 32% 28%, rgba(255,231,178,0.95), rgba(243,160,43,0.92) 38%, rgba(189,106,13,0.95) 70%, rgba(63,35,5,1) 100%)',
-          opacity: isError ? 0.7 : 1,
-        }}
-      >
-        {/* Inner highlight */}
-        <span
-          aria-hidden
-          className="pointer-events-none absolute inset-[14%] rounded-full"
-          style={{
-            background:
-              'radial-gradient(circle at 35% 30%, rgba(255,255,255,0.55), rgba(255,255,255,0) 55%)',
-            mixBlendMode: 'screen',
-          }}
-        />
-        {/* Inner shadow rim for depth */}
-        <span
-          aria-hidden
-          className="pointer-events-none absolute inset-0 rounded-full"
-          style={{
-            boxShadow:
-              'inset 0 -16px 30px rgba(0,0,0,0.45), inset 0 12px 24px rgba(255,231,178,0.25)',
-          }}
-        />
-      </button>
-    </div>
+      <canvas ref={canvasRef} className="block h-full w-full" />
+    </button>
   );
 }

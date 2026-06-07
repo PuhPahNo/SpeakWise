@@ -1,19 +1,19 @@
 import { Providers } from '@/components/providers';
 import type { Metadata, Viewport } from 'next';
-import { Fraunces, Inter } from 'next/font/google';
+import { Albert_Sans, Space_Grotesk } from 'next/font/google';
 import '@/styles/globals.css';
 
-const inter = Inter({
+// Brina direction — Space Grotesk (display) + Albert Sans (body).
+const albertSans = Albert_Sans({
   subsets: ['latin'],
   variable: '--font-sans',
   display: 'swap',
 });
 
-const fraunces = Fraunces({
+const spaceGrotesk = Space_Grotesk({
   subsets: ['latin'],
   variable: '--font-display',
   display: 'swap',
-  axes: ['opsz', 'SOFT'],
 });
 
 export const metadata: Metadata = {
@@ -28,12 +28,12 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#100e0c',
+  themeColor: '#0c1014',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${fraunces.variable} h-full`}>
+    <html lang="en" className={`${albertSans.variable} ${spaceGrotesk.variable} h-full`}>
       <body className="min-h-full antialiased bg-ink-800 text-ink-50">
         <div className="fixed inset-0 -z-10 bg-wise-aurora pointer-events-none" />
         <Providers>{children}</Providers>

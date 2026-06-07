@@ -1,59 +1,71 @@
 import type { Config } from 'tailwindcss';
 
+// ── Design direction: "Brina" + "Aqua" (Claude Design handoff) ──────────────
+// Sleek & AI-native cool-glass dark theme. The semantic token NAMES are kept
+// (ink/wise/sage) so every existing component reskins without edits; only the
+// underlying values change. oklch with an <alpha-value> slot so Tailwind's
+// opacity modifiers (bg-ink-800/70, text-wise-400/40, …) still resolve.
+const ACCENT = 'oklch(0.82 0.12 200)'; // Aqua — Wise's voice
+const ACCENT_2 = 'oklch(0.70 0.13 290)'; // Iris — cool counterpoint
+
 export default {
   content: ['./src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        // Warm-dark "ink" — the canvas
+        // Cool-slate "ink" — the canvas (hue ~250)
         ink: {
-          50: '#f8f6f1', // primary text on dark
-          100: '#e8e3d6', // secondary text on dark
-          200: '#a59e8e', // muted text
-          300: '#6f6a5e', // disabled / very muted
-          400: '#3d3a34', // hairline borders on dark
-          500: '#2a2723', // raised surface (cards)
-          600: '#1f1d1a', // surface
-          700: '#161412', // background variant
-          800: '#100e0c', // background
-          900: '#080706', // deepest
+          50: 'oklch(0.97 0.006 250 / <alpha-value>)', // primary text on dark
+          100: 'oklch(0.88 0.010 250 / <alpha-value>)', // secondary text
+          200: 'oklch(0.74 0.012 250 / <alpha-value>)', // muted text
+          300: 'oklch(0.56 0.014 250 / <alpha-value>)', // disabled / very muted
+          400: 'oklch(0.40 0.014 250 / <alpha-value>)', // hairline borders
+          500: 'oklch(0.24 0.016 252 / <alpha-value>)', // raised surface (cards)
+          600: 'oklch(0.20 0.014 250 / <alpha-value>)', // surface
+          700: 'oklch(0.185 0.013 250 / <alpha-value>)', // background variant
+          800: 'oklch(0.16 0.012 250 / <alpha-value>)', // background
+          900: 'oklch(0.12 0.012 250 / <alpha-value>)', // deepest
         },
-        // Warm gold accent — Wise's voice
+        // Aqua accent — Wise's voice
         wise: {
-          50: '#fff7e6',
-          100: '#ffe8b8',
-          200: '#ffd383',
-          300: '#fcb84d',
-          400: '#f3a02b',
-          500: '#e08818', // primary accent
-          600: '#bd6a0d',
-          700: '#925009',
-          800: '#693a08',
-          900: '#3f2305',
+          50: 'oklch(0.97 0.025 200 / <alpha-value>)',
+          100: 'oklch(0.93 0.050 200 / <alpha-value>)',
+          200: 'oklch(0.89 0.080 200 / <alpha-value>)',
+          300: 'oklch(0.86 0.100 200 / <alpha-value>)',
+          400: 'oklch(0.84 0.115 200 / <alpha-value>)',
+          500: 'oklch(0.82 0.120 200 / <alpha-value>)', // primary accent
+          600: 'oklch(0.73 0.115 203 / <alpha-value>)',
+          700: 'oklch(0.62 0.100 207 / <alpha-value>)',
+          800: 'oklch(0.50 0.085 210 / <alpha-value>)',
+          900: 'oklch(0.38 0.065 214 / <alpha-value>)',
         },
-        // Cool counterpoint for state colors
+        // Iris counterpoint for state colors
         sage: {
-          400: '#7fb89f',
-          500: '#5d9f86',
-          600: '#43806c',
+          400: 'oklch(0.78 0.110 290 / <alpha-value>)',
+          500: 'oklch(0.70 0.130 290 / <alpha-value>)',
+          600: 'oklch(0.60 0.120 292 / <alpha-value>)',
         },
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
-        display: ['var(--font-display)', 'Georgia', 'serif'],
+        display: ['var(--font-display)', 'system-ui', 'sans-serif'],
+      },
+      borderRadius: {
+        // Brina radii
+        xl: '14px',
+        '2xl': '18px',
       },
       backgroundImage: {
-        // Subtle warm aurora — used as the page backdrop
+        // Brina aurora — cool teal glow top-right + iris wash bottom-left
         'wise-aurora':
-          'radial-gradient(ellipse 80% 50% at 50% 0%, rgba(224, 136, 24, 0.10), transparent 60%), radial-gradient(ellipse 60% 40% at 0% 100%, rgba(93, 159, 134, 0.06), transparent 60%)',
+          'radial-gradient(ellipse 65% 50% at 78% -10%, color-mix(in oklch, oklch(0.82 0.12 200) 22%, transparent), transparent 55%), radial-gradient(ellipse 50% 45% at 10% 110%, color-mix(in oklch, oklch(0.70 0.13 290) 32%, transparent), transparent 60%)',
         'orb-gradient':
-          'radial-gradient(circle at 30% 30%, rgba(255, 211, 131, 0.95), rgba(224, 136, 24, 0.85) 40%, rgba(146, 80, 9, 0.95) 75%, rgba(63, 35, 5, 1) 100%)',
+          'radial-gradient(circle at 32% 30%, color-mix(in oklch, oklch(0.82 0.12 200) 90%, white), oklch(0.82 0.12 200) 55%, color-mix(in oklch, oklch(0.82 0.12 200) 60%, black) 100%)',
       },
       boxShadow: {
-        'orb-glow':
-          '0 0 60px 10px rgba(224, 136, 24, 0.35), 0 0 120px 30px rgba(224, 136, 24, 0.15)',
+        'orb-glow': '0 0 60px 10px color-mix(in oklch, oklch(0.82 0.12 200) 35%, transparent)',
         'orb-glow-active':
-          '0 0 80px 20px rgba(224, 136, 24, 0.55), 0 0 180px 50px rgba(224, 136, 24, 0.25)',
+          '0 0 80px 20px color-mix(in oklch, oklch(0.82 0.12 200) 55%, transparent)',
       },
       animation: {
         'orb-breathe': 'orb-breathe 4s ease-in-out infinite',
