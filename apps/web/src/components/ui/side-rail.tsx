@@ -8,6 +8,7 @@ import {
   Home,
   type LucideIcon,
   MessageSquareText,
+  Shield,
   User,
   Users,
 } from 'lucide-react';
@@ -22,6 +23,7 @@ const ICONS: Record<string, LucideIcon> = {
   profile: User,
   classroom: GraduationCap,
   students: Users,
+  admin: Shield,
 };
 
 export interface RailItem {

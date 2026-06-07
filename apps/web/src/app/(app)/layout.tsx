@@ -75,6 +75,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         },
       ];
 
+  // Admins get a dedicated entry into the admin console at the top of the rail.
+  if (user.role === 'admin') {
+    items.unshift({ href: '/admin', label: 'Admin', icon: 'admin' });
+  }
+
   return (
     <div className="md:grid md:h-screen md:grid-cols-[248px_1fr] md:overflow-hidden">
       <SideRail
@@ -85,7 +90,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         streakDays={streakDays}
       />
       <div className="flex min-w-0 flex-col md:h-screen md:min-h-0">
-        <TopBar name={user.name} />
+        <TopBar name={user.name} isAdmin={user.role === 'admin'} />
         <main className="flex-1 px-4 pb-24 pt-6 sm:px-6 md:overflow-y-auto md:px-8 md:pb-8">
           {children}
         </main>

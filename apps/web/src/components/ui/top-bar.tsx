@@ -16,7 +16,7 @@ function titleFor(pathname: string): { eyebrow: string; title: string } {
   return { eyebrow: '', title: 'Speakwise' };
 }
 
-export function TopBar({ name }: { name: string }) {
+export function TopBar({ name, isAdmin = false }: { name: string; isAdmin?: boolean }) {
   const pathname = usePathname();
   const { eyebrow, title } = titleFor(pathname);
   return (
@@ -35,7 +35,7 @@ export function TopBar({ name }: { name: string }) {
         </h1>
       </div>
       <div className="flex flex-none items-center gap-3">
-        <UserMenu name={name} />
+        <UserMenu name={name} isAdmin={isAdmin} />
       </div>
     </header>
   );

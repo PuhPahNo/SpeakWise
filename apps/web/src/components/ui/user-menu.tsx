@@ -1,10 +1,10 @@
 'use client';
 
-import { LogOut, User } from 'lucide-react';
+import { LogOut, Shield, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
-export function UserMenu({ name }: { name: string }) {
+export function UserMenu({ name, isAdmin = false }: { name: string; isAdmin?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
@@ -46,6 +46,14 @@ export function UserMenu({ name }: { name: string }) {
           <div className="px-3 py-2 border-b hairline text-sm text-ink-50">
             <div className="font-medium truncate">{name}</div>
           </div>
+          {isAdmin && (
+            <a
+              href="/admin"
+              className="flex items-center gap-2 px-3 py-2.5 text-sm text-wise-300 hover:bg-white/5"
+            >
+              <Shield size={14} aria-hidden /> Admin console
+            </a>
+          )}
           <a
             href="/profile"
             className="flex items-center gap-2 px-3 py-2.5 text-sm text-ink-100 hover:bg-white/5"
