@@ -5,8 +5,7 @@ import type { Config } from 'tailwindcss';
 // (ink/wise/sage) so every existing component reskins without edits; only the
 // underlying values change. oklch with an <alpha-value> slot so Tailwind's
 // opacity modifiers (bg-ink-800/70, text-wise-400/40, …) still resolve.
-const ACCENT = 'oklch(0.82 0.12 200)'; // Aqua — Wise's voice
-const ACCENT_2 = 'oklch(0.70 0.13 290)'; // Iris — cool counterpoint
+// Accent = Aqua oklch(0.82 0.12 200); counterpoint = Iris oklch(0.70 0.13 290).
 
 export default {
   content: ['./src/**/*.{ts,tsx}'],
