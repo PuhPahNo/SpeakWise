@@ -382,3 +382,8 @@ input:-webkit-autofill:focus {
   .skill-row{grid-template-columns:1fr 90px 30px;gap:10px}
   .heatmap{grid-template-columns:repeat(10,1fr)}
 }
+
+/* chat composer mic + small suggestion chips (used by wise-chat) */
+.composer-mic{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:var(--text-muted);flex:none;align-self:flex-end;transition:all .15s}
+.composer-mic:hover{color:var(--accent);background:var(--accent-soft)}
+.suggest.sm{font-size:.8rem;padding:7px 13px}

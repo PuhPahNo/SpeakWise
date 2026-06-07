@@ -23,13 +23,11 @@ export default async function CommandCenterPage() {
   const defaultMode: 'voice' | 'text' = prefersText || !voice.available ? 'text' : 'voice';
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
-      <CommandCenter
-        firstName={firstName}
-        sessionMinutes={profile.preferredSessionLengthMinutes ?? 10}
-        defaultMode={defaultMode}
-        voiceAvailable={voice.available}
-      />
-    </div>
+    <CommandCenter
+      firstName={firstName}
+      sessionMinutes={profile.preferredSessionLengthMinutes ?? 10}
+      defaultMode={defaultMode}
+      voiceAvailable={voice.available}
+    />
   );
 }

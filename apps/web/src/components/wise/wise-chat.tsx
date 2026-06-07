@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2, Send, Volume2 } from 'lucide-react';
+import { Loader2, Mic, Send, Volume2 } from 'lucide-react';
 import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -173,93 +173,96 @@ export function WiseChat({ firstName }: { firstName: string }) {
   const onlyOpener = messages.length === 1;
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-2xl flex-col px-0 sm:px-2">
-      {/* messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 space-y-3">
-        {messages.map((m, i) => {
-          const isLast = i === messages.length - 1;
-          if (m.role === 'user') {
-            return (
-              <div key={i} className="flex justify-end">
-                <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-wise-500 px-4 py-2.5 text-ink-900">
-                  {m.content}
+    <div className="chat-screen">
+      <div className="chat-scroll" ref={scrollRef}>
+        <div className="chat-inner">
+          {messages.map((m, i) => {
+            const isLast = i === messages.length - 1;
+            if (m.role === 'user') {
+              return (
+                <div key={i} className="msg msg-user">
+                  <div className="bubble bubble-user">{m.content}</div>
                 </div>
+              );
+            }
+            const showTyping = !m.content && streaming && isLast;
+            return (
+              <div key={i} className="msg msg-wise">
+                <div className="wise-badge" aria-hidden>
+                  <span className="wise-dot" />
+                </div>
+                {showTyping ? (
+                  <div className="bubble bubble-wise typing">
+                    <span className="dot" />
+                    <span className="dot" />
+                    <span className="dot" />
+                  </div>
+                ) : (
+                  <div className="bubble bubble-wise">
+                    <Markdown content={m.content} />
+                    {m.content && !(streaming && isLast) ? (
+                      <button
+                        type="button"
+                        onClick={() => void listen(m.content)}
+                        className="listen-btn"
+                        aria-label="Listen to this message"
+                      >
+                        <Volume2 size={13} /> Listen
+                      </button>
+                    ) : null}
+                  </div>
+                )}
               </div>
             );
-          }
-          return (
-            <div key={i} className="flex justify-start">
-              <div className="max-w-[88%] rounded-2xl rounded-bl-sm border hairline bg-ink-800/60 px-4 py-2.5 text-ink-50">
-                {m.content ? (
-                  <div className="text-[15px]">
-                    <Markdown content={m.content} />
-                  </div>
-                ) : streaming && isLast ? (
-                  <span className="inline-flex items-center gap-1 text-ink-300">
-                    <Loader2 size={14} className="animate-spin" /> Wise is typing…
-                  </span>
-                ) : null}
-                {m.content && !(streaming && isLast) ? (
-                  <button
-                    type="button"
-                    onClick={() => void listen(m.content)}
-                    className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-ink-400 transition hover:text-ink-100"
-                    aria-label="Listen to this message"
-                  >
-                    <Volume2 size={12} /> Listen
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          );
-        })}
-
-        {onlyOpener ? (
-          <div className="flex flex-wrap gap-2 pt-2">
-            {SUGGESTIONS.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => void send(s)}
-                className="rounded-full border hairline bg-ink-800/40 px-3 py-1.5 text-sm text-ink-200 transition hover:bg-ink-700/60 hover:text-ink-50"
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        ) : null}
+          })}
+        </div>
       </div>
 
-      {/* input */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void send(input);
-        }}
-        className="flex items-end gap-2 pt-2 pb-[88px] md:pb-4"
-      >
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+      <div className="composer">
+        <div className="composer-inner">
+          {onlyOpener && (
+            <div className="composer-chips">
+              {SUGGESTIONS.map((s) => (
+                <button key={s} type="button" className="suggest sm" onClick={() => void send(s)}>
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+          <form
+            className="composer-bar"
+            onSubmit={(e) => {
               e.preventDefault();
               void send(input);
-            }
-          }}
-          rows={1}
-          placeholder="Message Wise…"
-          className="flex-1 resize-none rounded-2xl border hairline bg-ink-800/60 px-4 py-3 text-[15px] text-ink-50 placeholder:text-ink-400 focus:outline-none focus:ring-1 focus:ring-wise-500 max-h-40"
-        />
-        <button
-          type="submit"
-          disabled={!input.trim() || streaming}
-          aria-label="Send"
-          className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-wise-500 text-ink-900 transition hover:bg-wise-400 disabled:opacity-50"
-        >
-          {streaming ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-        </button>
-      </form>
+            }}
+          >
+            <a href="/command-center" className="composer-mic" aria-label="Switch to voice">
+              <Mic size={18} aria-hidden />
+            </a>
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  void send(input);
+                }
+              }}
+              rows={1}
+              placeholder="Message Wise… (try Italian!)"
+              className="composer-input"
+            />
+            <button
+              type="submit"
+              disabled={!input.trim() || streaming}
+              aria-label="Send"
+              className="composer-send"
+            >
+              {streaming ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useToast } from '@/components/ui/toast';
 import { VoiceOrb } from '@/components/voice/voice-orb';
 import { WiseChat } from '@/components/wise/wise-chat';
 import { useVoiceTutor } from '@/hooks/use-voice-tutor';
-import { Flame, MessageSquareText, Mic, Sparkles } from 'lucide-react';
+import { ArrowRight, BookOpen, Flame, MessageSquareText, Mic, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
@@ -348,11 +348,35 @@ export function CommandCenter({
   }
 
   const dueCount = (greeting?.context.dueSkillCount ?? 0) + (greeting?.context.dueVocabCount ?? 0);
+  const vstate = pending ? 'thinking' : tutor.state;
+  const dotClass =
+    vstate === 'listening'
+      ? 's-listening'
+      : vstate === 'speaking'
+        ? 's-speaking'
+        : vstate === 'thinking' || vstate === 'processing_transcription'
+          ? 's-thinking'
+          : '';
+  const SUGGESTIONS = [
+    'Help me practice the passato prossimo',
+    'How do I order food at a restaurant?',
+    'Quiz me on travel vocabulary',
+  ];
+  async function askSuggestion(s: string) {
+    setUserLine(s);
+    addTurn('user', s);
+    try {
+      await tutor.primeAudio();
+    } catch {
+      /* audio unlock is best-effort */
+    }
+    await sendToWise(s);
+  }
 
   return (
-    <div className="flex flex-col items-center gap-7 sm:gap-9">
+    <div className="home-wrap">
       {summary && (summary.streakDays > 0 || summary.xpTotal > 0) && (
-        <div className="flex items-center gap-3 text-sm text-ink-200">
+        <div className="mx-auto mb-4 flex items-center gap-3 text-sm text-ink-200">
           {summary.streakDays > 0 && (
             <span className="inline-flex items-center gap-1.5">
               <Flame size={14} className="text-wise-400" aria-hidden />
@@ -371,99 +395,78 @@ export function CommandCenter({
         </div>
       )}
 
-      {/* Language-immersion + tutor controls moved off the home page —
-          they live on /profile now. */}
-
-      <h1 className="font-display text-2xl sm:text-3xl text-ink-50 leading-tight">
-        Welcome back, {firstName}.
-      </h1>
-
-      {/* Interface toggle — flips the home dashboard between the voice orb and
-          the text chat IN PLACE. The choice persists per-browser. Voice is
+      {/* Voice / Chat segmented toggle — flips the dashboard in place. Voice is
           disabled (and we stay in chat) when ElevenLabs TTS can't run from the
           server; it auto-enables once the plan is upgraded. */}
-      <div className="flex flex-col items-center gap-1.5">
-        <div className="inline-flex items-center rounded-full surface p-0.5 text-xs">
-          <button
-            type="button"
-            onClick={() => switchMode('voice')}
-            disabled={!voiceAvailable}
-            aria-pressed={mode === 'voice'}
-            title={voiceAvailable ? undefined : 'Voice needs an ElevenLabs plan upgrade'}
-            className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 transition ${
-              mode === 'voice' ? 'bg-wise-500 text-ink-900' : 'text-ink-200 hover:text-ink-50'
-            } ${voiceAvailable ? '' : 'cursor-not-allowed opacity-40 hover:text-ink-200'}`}
-          >
-            <Mic size={13} aria-hidden /> Voice
-          </button>
-          <button
-            type="button"
-            onClick={() => switchMode('text')}
-            aria-pressed={mode === 'text'}
-            className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 transition ${
-              mode === 'text' ? 'bg-wise-500 text-ink-900' : 'text-ink-200 hover:text-ink-50'
-            }`}
-          >
-            <MessageSquareText size={13} aria-hidden /> Chat
-          </button>
-        </div>
-        {!voiceAvailable && (
-          <p className="text-[11px] text-ink-300">
-            Voice is off — upgrade ElevenLabs to enable it.
-          </p>
-        )}
+      <div className="seg mx-auto mb-6 w-full max-w-[260px]">
+        <button
+          type="button"
+          onClick={() => switchMode('voice')}
+          disabled={!voiceAvailable}
+          aria-pressed={mode === 'voice'}
+          title={voiceAvailable ? undefined : 'Voice needs an ElevenLabs plan upgrade'}
+          className={`seg-btn ${mode === 'voice' ? 'on' : ''}`}
+        >
+          <Mic size={15} aria-hidden /> Voice
+        </button>
+        <button
+          type="button"
+          onClick={() => switchMode('text')}
+          aria-pressed={mode === 'text'}
+          className={`seg-btn ${mode === 'text' ? 'on' : ''}`}
+        >
+          <MessageSquareText size={15} aria-hidden /> Chat
+        </button>
       </div>
+      {!voiceAvailable && (
+        <p className="-mt-4 mb-5 text-center text-[11px] text-ink-300">
+          Voice is off — upgrade ElevenLabs to enable it.
+        </p>
+      )}
 
       {mode === 'text' ? (
         // Text chat fills the dashboard in place of the orb.
-        <div className="w-full h-[calc(100dvh-9.5rem)] min-h-[420px]">
+        <div className="h-[calc(100vh-13rem)] min-h-[440px] w-full">
           <WiseChat firstName={firstName} />
         </div>
       ) : (
         <>
-          {/* ── Voice interface ───────────────────────────────────────── */}
-          <VoiceOrb
-            state={pending ? 'thinking' : tutor.state}
-            size="lg"
-            amplitude={tutor.amplitude}
-            onTap={onOrbTap}
-          />
-
-          <div className="text-center min-h-[5rem] max-w-xl">
-            {wiseLine ? (
-              <p className="font-display text-xl sm:text-2xl text-ink-50 animate-fade-up leading-snug">
-                {wiseLine}
-              </p>
-            ) : (
-              <p className="text-ink-200 text-sm">Loading…</p>
-            )}
-            {userLine && tutor.state !== 'listening' && (
-              <p className="mt-3 text-sm text-ink-200 italic animate-fade-up">
-                you: &ldquo;{userLine}&rdquo;
-              </p>
-            )}
+          <div className="home-greeting">
+            <div className="eyebrow" style={{ marginBottom: 10 }}>
+              {firstName ? `Bentornato, ${firstName}` : 'Bentornato'}
+            </div>
+            <p className="home-line">{wiseLine || `Ciao ${firstName}! Pronto per imparare?`}</p>
           </div>
 
-          <p className="text-xs text-ink-200 -mt-2">{statusText()}</p>
+          <div className="wave-holder">
+            <VoiceOrb state={vstate} size="xl" amplitude={tutor.amplitude} onTap={onOrbTap} />
+          </div>
 
-          {/* Running transcript — appears once a spoken conversation starts.
-              This is the freestyle "Talk" experience, folded into Home. */}
-          {turns.length > 0 && (
-            <div
-              ref={convoRef}
-              className="w-full max-w-xl max-h-[34vh] overflow-y-auto surface rounded-2xl p-4 space-y-2.5"
-            >
+          <div className="home-status">
+            <span className={`status-dot ${dotClass}`} aria-hidden />
+            {statusText()}
+          </div>
+
+          {turns.length === 0 ? (
+            <div className="suggest-row">
+              {SUGGESTIONS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className="suggest"
+                  disabled={pending}
+                  onClick={() => void askSuggestion(s)}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="transcript" ref={convoRef}>
               {turns.map((t) => (
-                <div key={t.ts} className={t.role === 'user' ? 'text-right' : 'text-left'}>
-                  <div
-                    className={`inline-block max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-snug ${
-                      t.role === 'user'
-                        ? 'bg-wise-500/15 border border-wise-500/25 text-ink-50'
-                        : 'bg-white/5 border border-white/10 text-ink-50'
-                    }`}
-                  >
-                    {t.text}
-                  </div>
+                <div key={t.ts} className={`tline ${t.role === 'user' ? 'user' : ''}`}>
+                  <span className="tline-who">{t.role === 'wise' ? 'Wise' : 'You'}</span>
+                  <span className="tline-text">{t.text}</span>
                 </div>
               ))}
             </div>
@@ -471,58 +474,73 @@ export function CommandCenter({
 
           {comeback && (
             <button
+              type="button"
               onClick={startComebackLesson}
               disabled={pending}
-              className="w-full max-w-xl text-left rounded-2xl p-5 sm:p-6 surface border-wise-500/40 text-ink-50 hover:border-wise-500/70 transition disabled:opacity-60"
+              className="card card-pad card-hover mt-7 w-full max-w-[600px] text-left disabled:opacity-60"
+              style={{ borderColor: 'var(--accent-line)' }}
             >
-              <div className="text-[11px] uppercase tracking-[0.2em] text-wise-400">
+              <div className="eyebrow" style={{ color: 'var(--accent)' }}>
                 Welcome back
               </div>
-              <div className="font-display text-lg sm:text-xl mt-2">
+              <div className="mt-2 font-display text-lg text-ink-50 sm:text-xl">
                 {comeback.daysMissed === 1
                   ? 'A short reset — pick up where you left off'
                   : `It's been ${comeback.daysMissed} days. Quick warm-up to ease back in.`}
               </div>
-              <div className="text-sm mt-1 text-ink-200">
+              <div className="mt-1 text-sm text-ink-200">
                 ~{comeback.recommendedDurationMinutes} min · low pressure, recent vocab
               </div>
             </button>
           )}
 
-          <div className="grid sm:grid-cols-2 gap-3 sm:gap-4 w-full max-w-xl">
+          <div className="home-actions">
             <button
+              type="button"
               onClick={startMission}
               disabled={pending}
-              className="text-left rounded-2xl p-5 sm:p-6 bg-wise-500 hover:bg-wise-600 active:bg-wise-700 text-ink-900 transition disabled:opacity-60"
+              className="card card-pad action-primary text-left disabled:opacity-60"
             >
-              <div className="text-[11px] uppercase tracking-[0.2em] opacity-80">
-                {immersionMode || languageRatio > 0.5 ? 'Inizia' : 'Start'}
+              <div>
+                <div className="eyebrow">
+                  {immersionMode || languageRatio > 0.5 ? 'Inizia · Start' : 'Start'}
+                </div>
+                <div className="action-title">Today&apos;s mission</div>
+                <div className="action-sub">~{sessionMinutes} min</div>
               </div>
-              <div className="font-display text-xl sm:text-2xl mt-2">Today&apos;s mission</div>
-              <div className="text-sm mt-1 opacity-90">~{sessionMinutes} min</div>
+              <span className="action-go">
+                <ArrowRight size={20} aria-hidden />
+              </span>
             </button>
-            <a
-              href="/vocabulary/review"
-              className="text-left rounded-2xl p-5 sm:p-6 surface text-ink-50 hover:border-wise-500/40 transition"
-            >
-              <div className="text-[11px] uppercase tracking-[0.2em] text-ink-200">
-                {immersionMode || languageRatio > 0.5 ? 'Ripasso' : 'Review'}
-              </div>
-              <div className="font-display text-xl sm:text-2xl mt-2">
-                {dueCount > 0 ? `${dueCount} due` : 'All caught up'}
-              </div>
-              <div className="text-sm mt-1 text-ink-200">
-                {dueCount > 0 ? 'Quick wins for spaced repetition' : 'Come back tomorrow'}
-              </div>
-            </a>
-          </div>
 
-          <div className="w-full max-w-xl text-sm">
+            <a href="/vocabulary/review" className="card card-pad card-hover action-soft text-left">
+              <div>
+                <div className="eyebrow">
+                  {immersionMode || languageRatio > 0.5 ? 'Ripasso · Review' : 'Review'}
+                </div>
+                <div className="action-title">
+                  {dueCount > 0 ? `${dueCount} due` : 'All caught up'}
+                </div>
+                <div className="action-sub">
+                  {dueCount > 0 ? 'Quick spaced-repetition wins' : 'Come back tomorrow'}
+                </div>
+              </div>
+              <span className="action-go ghost">
+                <ArrowRight size={20} aria-hidden />
+              </span>
+            </a>
+
             <a
               href="/lessons"
-              className="block text-center rounded-xl px-4 py-3 surface text-ink-100 hover:text-ink-50 hover:border-wise-500/40 transition"
+              className="card card-pad card-hover full-span flex items-center gap-3.5"
             >
-              Past lessons
+              <span className="mode-icon">
+                <BookOpen size={18} aria-hidden />
+              </span>
+              <div>
+                <div className="action-title sm">Past lessons</div>
+                <div className="action-sub">Revisit what you&apos;ve completed</div>
+              </div>
             </a>
           </div>
         </>
