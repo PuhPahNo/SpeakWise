@@ -1,92 +1,96 @@
 import { MobileTabBar } from '@/components/ui/mobile-tab-bar';
-import { UserMenu } from '@/components/ui/user-menu';
+import { type RailItem, SideRail } from '@/components/ui/side-rail';
+import { TopBar } from '@/components/ui/top-bar';
 import { getCurrentUser } from '@/lib/auth/current-user';
 import { prisma } from '@speakwise/db';
-import Link from 'next/link';
 
 /**
- * Pick ONE language for a nav label based on the learner's ratio band.
- * Previously we stacked EN over a tiny IT subtitle, which felt cluttered
- * and didn't visually center well at small text sizes. A single word is
- * cleaner and scales with the learner: English for beginners, Italian
- * once they're comfortable.
- *   ratio ≤ 0.50  →  English
- *   ratio  > 0.50 →  Italian
- *   immersion    →  Italian
+ * One language per nav label, by the learner's ratio band:
+ *   ratio ≤ 0.50 / non-immersion → English; otherwise Italian.
  */
 function navLabel(en: string, it: string, ratio: number, immersion: boolean): string {
-  if (immersion) return it;
-  if (ratio > 0.5) return it;
-  return en;
+  return immersion || ratio > 0.5 ? it : en;
 }
+
+// CEFRLevel enum → short ladder code for the rail chip.
+const LEVEL_CODE: Record<string, string> = {
+  complete_beginner: 'A1',
+  beginner: 'A1',
+  lower_intermediate: 'A2',
+  intermediate: 'B1',
+  upper_intermediate: 'B2',
+  advanced: 'C1',
+};
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   const isTutor = user.role === 'tutor';
-  // Learners get bilingual nav scaled to their languageRatio; tutors and
-  // admins always see English (they're not learning).
+
   let ratio = 0;
   let immersion = false;
+  let levelCode: string | undefined;
+  let streakDays: number | undefined;
   if (!isTutor) {
-    const profile = await prisma.learnerProfile.findUnique({
-      where: { userId: user.id },
-      select: { languageRatio: true, immersionMode: true },
-    });
+    const [profile, streak] = await Promise.all([
+      prisma.learnerProfile.findUnique({
+        where: { userId: user.id },
+        select: { languageRatio: true, immersionMode: true, currentLevel: true },
+      }),
+      prisma.userStreak.findUnique({
+        where: { userId: user.id },
+        select: { currentDays: true },
+      }),
+    ]);
     if (profile) {
       ratio = Number(profile.languageRatio ?? 0.1);
       immersion = Boolean(profile.immersionMode);
+      levelCode = LEVEL_CODE[profile.currentLevel] ?? 'A1';
     }
+    streakDays = streak?.currentDays;
   }
+
+  const items: RailItem[] = isTutor
+    ? [
+        { href: '/classroom', label: 'Classroom', icon: 'classroom' },
+        { href: '/classroom?tab=students', label: 'Students', icon: 'students' },
+        { href: '/profile', label: 'Profile', icon: 'profile' },
+      ]
+    : [
+        {
+          href: '/command-center',
+          label: navLabel('Home', 'Casa', ratio, immersion),
+          icon: 'home',
+        },
+        { href: '/chat', label: navLabel('Chat', 'Conversa', ratio, immersion), icon: 'chat' },
+        {
+          href: '/progress',
+          label: navLabel('Progress', 'Progressi', ratio, immersion),
+          icon: 'progress',
+        },
+        { href: '/course', label: navLabel('Course', 'Corso', ratio, immersion), icon: 'course' },
+        {
+          href: '/profile',
+          label: navLabel('Profile', 'Profilo', ratio, immersion),
+          icon: 'profile',
+        },
+      ];
+
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="sticky top-0 z-30 px-4 sm:px-6 py-3 flex items-center justify-between bg-ink-800/70 backdrop-blur supports-[backdrop-filter]:bg-ink-800/55 border-b hairline">
-        <Link
-          href={isTutor ? '/classroom' : '/command-center'}
-          className="font-display text-lg sm:text-xl text-ink-50"
-        >
-          Speakwise
-        </Link>
-        {/* Top nav branches by role. Tutors see a Classroom-centric nav;
-            learners see voice-first tabs whose labels follow their
-            languageRatio (English-primary for beginners, Italian for
-            advanced). The MobileTabBar in components/ui/mobile-tab-bar.tsx
-            is learner-only and renders nothing for tutors. */}
-        {isTutor ? (
-          <nav className="hidden md:flex gap-6 text-sm text-ink-200">
-            <Link href="/classroom" className="hover:text-ink-50 transition">
-              Classroom
-            </Link>
-            <Link href="/classroom?tab=students" className="hover:text-ink-50 transition">
-              Students
-            </Link>
-            <Link href="/profile" className="hover:text-ink-50 transition">
-              Profile
-            </Link>
-          </nav>
-        ) : (
-          // Single-language nav by ratio band; cleaner than the stacked
-          // EN/IT we shipped before. /lessons and /vocabulary moved into
-          // the Progress dashboard so they're not separate top-level
-          // tabs anymore (still reachable via dashboard CTAs).
-          <nav className="hidden md:flex gap-8 text-[15px] text-ink-200 items-center">
-            <Link href="/command-center" className="hover:text-ink-50 transition">
-              {navLabel('Home', 'Casa', ratio, immersion)}
-            </Link>
-            <Link href="/course" className="hover:text-ink-50 transition">
-              {navLabel('Course', 'Corso', ratio, immersion)}
-            </Link>
-            <Link href="/progress" className="hover:text-ink-50 transition">
-              {navLabel('Progress', 'Progressi', ratio, immersion)}
-            </Link>
-            <Link href="/profile" className="hover:text-ink-50 transition">
-              {navLabel('Profile', 'Profilo', ratio, immersion)}
-            </Link>
-          </nav>
-        )}
-        <UserMenu name={user.name} />
-      </header>
-      <main className="flex-1 pb-20 md:pb-0">{children}</main>
-      {/* MobileTabBar is learner-only; hide it entirely for tutors. */}
+    <div className="md:grid md:h-screen md:grid-cols-[248px_1fr] md:overflow-hidden">
+      <SideRail
+        brandHref={isTutor ? '/classroom' : '/command-center'}
+        items={items}
+        learnerName={user.name}
+        levelCode={levelCode}
+        streakDays={streakDays}
+      />
+      <div className="flex min-w-0 flex-col md:h-screen md:min-h-0">
+        <TopBar name={user.name} />
+        <main className="flex-1 px-4 pb-24 pt-6 sm:px-6 md:overflow-y-auto md:px-8 md:pb-8">
+          {children}
+        </main>
+      </div>
+      {/* Learner-only bottom bar on mobile; tutors get none. */}
       {isTutor ? null : <MobileTabBar />}
     </div>
   );

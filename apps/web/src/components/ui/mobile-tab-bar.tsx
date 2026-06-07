@@ -1,17 +1,17 @@
 'use client';
 
-import { BarChart3, BookOpen, Home, User } from 'lucide-react';
+import { BarChart3, BookOpen, Home, MessageSquareText, User } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-// Mobile bottom-tab nav. Mirrors the desktop top nav structure:
-// vocabulary + lessons folded into the Progress dashboard, not separate
-// tabs. /vocabulary/review still reachable via dashboard CTA.
+// Mobile bottom-tab nav. Mirrors the desktop left-rail order:
+// Home · Chat · Progress · Course · Profile.
 const tabs = [
   { href: '/command-center', en: 'Home', it: 'Casa', Icon: Home },
-  { href: '/course', en: 'Course', it: 'Corso', Icon: BookOpen },
+  { href: '/chat', en: 'Chat', it: 'Conversa', Icon: MessageSquareText },
   { href: '/progress', en: 'Progress', it: 'Progressi', Icon: BarChart3 },
+  { href: '/course', en: 'Course', it: 'Corso', Icon: BookOpen },
   { href: '/profile', en: 'Profile', it: 'Profilo', Icon: User },
 ];
 
@@ -52,7 +52,7 @@ export function MobileTabBar() {
       className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t hairline bg-ink-800/85 backdrop-blur supports-[backdrop-filter]:bg-ink-800/65"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <ul className="grid grid-cols-4">
+      <ul className="grid grid-cols-5">
         {tabs.map(({ href, en, it, Icon }) => {
           const active = pathname === href || pathname.startsWith(`${href}/`);
           return (
