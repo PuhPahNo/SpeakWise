@@ -36,30 +36,25 @@ export default async function CoursePage() {
   const masteredSkills = units.reduce((n, u) => n + u.mastered, 0);
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 py-6 sm:py-8">
-      <header className="mb-6">
-        <p className="text-xs uppercase tracking-widest text-ink-300">Il corso</p>
-        <h1 className="font-display text-2xl sm:text-3xl text-ink-50 mt-1">The Italian course</h1>
-        <p className="text-ink-200 mt-2 text-[15px] leading-relaxed">
+    <div className="page">
+      <header className="sect" style={{ gap: 6 }}>
+        <p className="text-[15px] leading-relaxed text-ink-200">
           Twenty chapters from first hello to fluent conversation — greetings and sounds all the way
           to the subjunctive. Every chapter feeds Wise the skills behind your lessons, themed to
           what you care about.
         </p>
-        <p className="text-ink-300 text-sm mt-3">
+        <p className="text-sm text-ink-300">
           {masteredSkills} of {totalSkills} skills mastered
         </p>
       </header>
 
-      <ol className="space-y-3">
+      <ol className="flex flex-col gap-3">
         {units.map((u) => {
           const pct = u.total > 0 ? Math.round((u.mastered / u.total) * 100) : 0;
           const startedPct = u.total > 0 ? Math.round((u.started / u.total) * 100) : 0;
           return (
             <li key={u.code}>
-              <Link
-                href={`/course/${u.code}`}
-                className="block rounded-2xl border hairline bg-ink-800/50 p-4 transition hover:bg-ink-800/80"
-              >
+              <Link href={`/course/${u.code}`} className="card card-pad card-hover block">
                 <div className="flex items-start gap-3">
                   <div className="shrink-0 grid place-items-center h-10 w-10 rounded-full bg-ink-900/60 text-base">
                     <span aria-hidden="true">{THEME_EMOJI[u.theme] ?? '🇮🇹'}</span>
@@ -78,11 +73,8 @@ export default async function CoursePage() {
                       {LEVEL_LABEL[u.level] ?? u.level}
                     </p>
                     {/* progress: a filled bar for mastered, a fainter one for started */}
-                    <div className="mt-2 h-1.5 w-full rounded-full bg-ink-900/70 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-wise-500"
-                        style={{ width: `${pct}%` }}
-                      />
+                    <div className="dbar mt-2 h-1.5">
+                      <i style={{ width: `${pct}%` }} />
                     </div>
                     <p className="text-xs text-ink-400 mt-1">
                       {u.mastered}/{u.total} mastered

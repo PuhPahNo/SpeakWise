@@ -24,15 +24,12 @@ export default async function ProgressPage() {
   const dashboard = await getFluencyDashboard(user.id);
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 sm:space-y-10">
-      <div>
-        <h1 className="font-display text-2xl sm:text-3xl text-ink-50">Your progress</h1>
-        <p className="text-sm text-ink-200 mt-1">
-          {dashboard.isFresh
-            ? 'Take your first lesson to start filling this in.'
-            : 'Where you are, where you’ve been, and what Wise is teeing up next.'}
-        </p>
-      </div>
+    <div className="page">
+      <p className="-mt-1 text-sm text-ink-200">
+        {dashboard.isFresh
+          ? 'Take your first lesson to start filling this in.'
+          : 'Where you are, where you’ve been, and what Wise is teeing up next.'}
+      </p>
 
       {/* CEFR hero — where am I on the official scale */}
       <CefrHero progress={dashboard.cefrProgress} learnerName={dashboard.learner.name} />
