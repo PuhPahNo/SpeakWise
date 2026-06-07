@@ -224,6 +224,59 @@ export const ImportMediaRequestSchema = z.object({
   userIntent: z.string().max(500).optional(),
 });
 
+// ── Admin: user management ────────────────────────────────────────────
+export const UserRoleEnum = z.enum(['learner', 'admin', 'tutor', 'student', 'organization_admin']);
+
+export const AdminUserListQuerySchema = z.object({
+  /** Free-text search across username / name / email. */
+  q: z.string().trim().max(120).optional(),
+  role: UserRoleEnum.optional(),
+});
+
+const usernameField = z
+  .string()
+  .trim()
+  .min(3)
+  .max(120)
+  .regex(/^[a-zA-Z0-9._-]+$/, 'letters, numbers, dot, underscore, hyphen only');
+// Accept a real email or an empty string (treated as "clear").
+const optionalEmail = z.union([z.string().trim().email().max(200), z.literal('')]);
+
+export const AdminCreateUserRequestSchema = z.object({
+  username: usernameField,
+  name: z.string().trim().min(1).max(120),
+  email: optionalEmail.optional(),
+  role: UserRoleEnum.default('learner'),
+  /** Omit to auto-generate a strong temporary password (returned once). */
+  password: z.string().min(8).max(200).optional(),
+  timezone: z.string().max(80).optional(),
+  nativeLanguage: z.enum(['en', 'it']).optional(),
+  targetLanguage: z.enum(['en', 'it']).optional(),
+});
+
+export const AdminUpdateUserRequestSchema = z.object({
+  username: usernameField.optional(),
+  name: z.string().trim().min(1).max(120).optional(),
+  email: optionalEmail.nullable().optional(),
+  role: UserRoleEnum.optional(),
+  timezone: z.string().max(80).nullable().optional(),
+  nativeLanguage: z.enum(['en', 'it']).optional(),
+  targetLanguage: z.enum(['en', 'it']).optional(),
+});
+
+export const AdminResetPasswordRequestSchema = z.object({
+  /** Omit to auto-generate a strong temporary password (returned once). */
+  password: z.string().min(8).max(200).optional(),
+});
+
+/** Admin edit of a learner's profile — all the learner-settable fields plus
+ *  the onboarding flag. Reuses the self-serve profile shape. */
+export const AdminUpdateProfileRequestSchema = PatchProfileRequestSchema.extend({
+  onboardingCompleted: z.boolean().optional(),
+});
+
 export type WiseMessageRequest = z.infer<typeof WiseMessageRequestSchema>;
 export type GenerateLessonRequest = z.infer<typeof GenerateLessonRequestSchema>;
 export type PracticeRespondRequest = z.infer<typeof PracticeRespondRequestSchema>;
+export type AdminCreateUserRequest = z.infer<typeof AdminCreateUserRequestSchema>;
+export type AdminUpdateUserRequest = z.infer<typeof AdminUpdateUserRequestSchema>;

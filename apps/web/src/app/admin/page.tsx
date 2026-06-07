@@ -1,11 +1,8 @@
-import { getOrCreateUser } from '@/lib/auth/current-user';
 import { aiUsageSummary, listFeatureFlags, listPromptTemplates } from '@/server/services/admin';
-import { redirect } from 'next/navigation';
+
+export const dynamic = 'force-dynamic';
 
 export default async function AdminPage() {
-  const user = await getOrCreateUser();
-  if (user.role !== 'admin') redirect('/command-center');
-
   const [prompts, flags, usage] = await Promise.all([
     listPromptTemplates(),
     listFeatureFlags(),
@@ -13,24 +10,22 @@ export default async function AdminPage() {
   ]);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 sm:space-y-10">
-      <h1 className="font-display text-2xl sm:text-3xl">Admin</h1>
-
+    <div className="space-y-8">
       <section>
-        <h2 className="font-display text-lg sm:text-xl mb-3">AI usage (last 24h)</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-          <Stat label="Calls" value={usage.totalCalls.toString()} />
-          <Stat label="Tokens in" value={usage.totalTokensIn.toString()} />
-          <Stat label="Tokens out" value={usage.totalTokensOut.toString()} />
-          <Stat label="Failures" value={usage.failures.toString()} />
+        <h2 className="sect-title mb-3">AI usage (last 24h)</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Stat label="Calls" value={usage.totalCalls.toLocaleString()} />
+          <Stat label="Tokens in" value={usage.totalTokensIn.toLocaleString()} />
+          <Stat label="Tokens out" value={usage.totalTokensOut.toLocaleString()} />
+          <Stat label="Failures" value={usage.failures.toLocaleString()} />
         </div>
       </section>
 
       <section>
-        <h2 className="font-display text-lg sm:text-xl mb-3">Prompt templates</h2>
-        <div className="overflow-x-auto -mx-4 sm:mx-0">
-          <table className="w-full text-sm min-w-[480px] px-4 sm:px-0">
-            <thead className="text-left text-ink-500 uppercase text-xs">
+        <h2 className="sect-title mb-3">Prompt templates</h2>
+        <div className="card card-pad overflow-x-auto">
+          <table className="w-full min-w-[480px] text-sm">
+            <thead className="text-left text-xs uppercase tracking-wider text-ink-300">
               <tr>
                 <th className="py-2">Key</th>
                 <th>v</th>
@@ -40,11 +35,11 @@ export default async function AdminPage() {
             </thead>
             <tbody>
               {prompts.map((p) => (
-                <tr key={p.id} className="border-t border-ink-100">
-                  <td className="py-2 font-mono">{p.key}</td>
-                  <td>{p.version}</td>
-                  <td>{p.purpose}</td>
-                  <td>{p.isEnabled ? 'on' : 'off'}</td>
+                <tr key={p.id} className="border-t hairline">
+                  <td className="py-2 font-mono text-ink-100">{p.key}</td>
+                  <td className="text-ink-200">{p.version}</td>
+                  <td className="text-ink-200">{p.purpose}</td>
+                  <td className="text-ink-200">{p.isEnabled ? 'on' : 'off'}</td>
                 </tr>
               ))}
             </tbody>
@@ -53,14 +48,15 @@ export default async function AdminPage() {
       </section>
 
       <section>
-        <h2 className="font-display text-xl mb-3">Feature flags</h2>
+        <h2 className="sect-title mb-3">Feature flags</h2>
         {flags.length === 0 ? (
-          <p className="text-ink-500 text-sm">None.</p>
+          <p className="text-sm text-ink-300">None.</p>
         ) : (
-          <ul className="space-y-1 text-sm">
+          <ul className="space-y-1 text-sm text-ink-200">
             {flags.map((f) => (
               <li key={f.id}>
-                <code>{f.key}</code> · {f.enabled ? 'on' : 'off'} · {f.rolloutPct}%
+                <code className="text-ink-100">{f.key}</code> · {f.enabled ? 'on' : 'off'} ·{' '}
+                {f.rolloutPct}%
               </li>
             ))}
           </ul>
@@ -72,9 +68,9 @@ export default async function AdminPage() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-ink-200 bg-white p-3 sm:p-4">
-      <div className="text-[10px] sm:text-xs uppercase tracking-wider text-ink-500">{label}</div>
-      <div className="font-display text-xl sm:text-2xl mt-1">{value}</div>
+    <div className="card card-pad">
+      <div className="eyebrow">{label}</div>
+      <div className="mini-val mt-1 text-ink-50">{value}</div>
     </div>
   );
 }

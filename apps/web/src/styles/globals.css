@@ -387,3 +387,7 @@ input:-webkit-autofill:focus {
 .composer-mic{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:var(--text-muted);flex:none;align-self:flex-end;transition:all .15s}
 .composer-mic:hover{color:var(--accent);background:var(--accent-soft)}
 .suggest.sm{font-size:.8rem;padding:7px 13px}
+
+/* Native checkbox/radio/range opt out of the dark text-input box styling. */
+input[type="range"]{padding:0;border:none;background:transparent;height:auto;accent-color:var(--accent)}
+input[type="checkbox"],input[type="radio"]{width:auto;height:auto;min-height:0;padding:0;border-radius:4px;accent-color:var(--accent)}

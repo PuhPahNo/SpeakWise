@@ -6,7 +6,6 @@ import { useState } from 'react';
 export function SignInForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get('next') ?? '/command-center';
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -24,7 +23,11 @@ export function SignInForm() {
         body: JSON.stringify({ username, password }),
       });
       if (res.ok) {
-        router.push(next);
+        // Admins land in the admin console; everyone else in the app (or the
+        // explicit `next` target if they were redirected to sign in).
+        const ok = (await res.json().catch(() => ({}))) as { user?: { role?: string } };
+        const fallback = ok.user?.role === 'admin' ? '/admin' : '/command-center';
+        router.push(params.get('next') ?? fallback);
         router.refresh();
         return;
       }

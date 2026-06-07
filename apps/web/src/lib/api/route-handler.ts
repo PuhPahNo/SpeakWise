@@ -10,6 +10,20 @@ export class ForbiddenError extends Error {
   }
 }
 
+export class NotFoundError extends Error {
+  constructor(message = 'Not found') {
+    super(message);
+    this.name = 'NotFoundError';
+  }
+}
+
+export class ConflictError extends Error {
+  constructor(message = 'Conflict') {
+    super(message);
+    this.name = 'ConflictError';
+  }
+}
+
 export interface AuthedContext {
   userId: string;
   user: Awaited<ReturnType<typeof getOrCreateUser>>;
@@ -18,6 +32,11 @@ export interface AuthedContext {
 export interface TutorContext extends AuthedContext {
   /** Role-narrowed: this user is guaranteed to be a tutor. */
   user: AuthedContext['user'] & { role: 'tutor' };
+}
+
+export interface AdminContext extends AuthedContext {
+  /** Role-narrowed: this user is guaranteed to be an admin. */
+  user: AuthedContext['user'] & { role: 'admin' };
 }
 
 export async function withAuth<T>(
@@ -100,12 +119,61 @@ export async function withTutorAuthAndJson<S extends ZodTypeAny, T>(
   }
 }
 
+/**
+ * Wrapper that requires the caller to be an admin. Mirrors withTutorAuth.
+ * Used by every /api/admin/* route.
+ */
+export async function withAdminAuth<T>(
+  handler: (ctx: AdminContext) => Promise<T>,
+): Promise<NextResponse> {
+  try {
+    const user = await getOrCreateUser();
+    if (user.role !== 'admin') throw new ForbiddenError('Admin access only');
+    const result = await handler({ userId: user.id, user: user as AdminContext['user'] });
+    return NextResponse.json(result);
+  } catch (err) {
+    return errorResponse(err);
+  }
+}
+
+export async function withAdminAuthAndJson<S extends ZodTypeAny, T>(
+  schema: S,
+  req: Request,
+  handler: (ctx: AdminContext, body: z.infer<S>) => Promise<T>,
+): Promise<NextResponse> {
+  try {
+    const user = await getOrCreateUser();
+    if (user.role !== 'admin') throw new ForbiddenError('Admin access only');
+    const json = await req.json().catch(() => ({}));
+    const parsed = schema.safeParse(json);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'invalid_request', issues: parsed.error.flatten() },
+        { status: 400 },
+      );
+    }
+    const result = await handler(
+      { userId: user.id, user: user as AdminContext['user'] },
+      parsed.data,
+    );
+    return NextResponse.json(result);
+  } catch (err) {
+    return errorResponse(err);
+  }
+}
+
 function errorResponse(err: unknown) {
   if (err instanceof UnauthenticatedError) {
     return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
   }
   if (err instanceof ForbiddenError) {
     return NextResponse.json({ error: 'forbidden', message: err.message }, { status: 403 });
+  }
+  if (err instanceof NotFoundError) {
+    return NextResponse.json({ error: 'not_found', message: err.message }, { status: 404 });
+  }
+  if (err instanceof ConflictError) {
+    return NextResponse.json({ error: 'conflict', message: err.message }, { status: 409 });
   }
   if (err instanceof AISchemaValidationError) {
     // Log the full raw and full issues — truncating either makes it
