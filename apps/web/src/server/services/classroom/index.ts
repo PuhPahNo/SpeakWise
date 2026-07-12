@@ -8,6 +8,7 @@
 // Prisma, and emit `UserEvent`s on state changes so the audit log
 // captures tutor activity the same way it captures learner activity.
 import { randomBytes } from 'node:crypto';
+import { ConflictError, ForbiddenError, NotFoundError } from '@/lib/api/errors';
 import { type DirectiveStatus, type TutorStudentStatus, prisma } from '@speakwise/db';
 import { emitUserEvent } from '@speakwise/events';
 
@@ -16,25 +17,25 @@ function generateInviteCode(): string {
   const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   const buf = randomBytes(8);
   let code = '';
-  for (let i = 0; i < 8; i++) code += alphabet[buf[i]! % alphabet.length];
+  for (let i = 0; i < 8; i++) code += alphabet[(buf[i] ?? 0) % alphabet.length];
   return code;
 }
 
-export class NotATutorError extends Error {
+export class NotATutorError extends ForbiddenError {
   constructor() {
     super('User is not a tutor');
     this.name = 'NotATutorError';
   }
 }
 
-export class StudentNotLinkedError extends Error {
+export class StudentNotLinkedError extends ForbiddenError {
   constructor() {
     super('Student is not linked to this tutor');
     this.name = 'StudentNotLinkedError';
   }
 }
 
-export class InviteCodeNotFoundError extends Error {
+export class InviteCodeNotFoundError extends NotFoundError {
   constructor() {
     super('Invite code not found');
     this.name = 'InviteCodeNotFoundError';
@@ -89,16 +90,40 @@ export async function rotateInviteCode(tutorUserId: string) {
  * 'active' (un-pausing or un-ending the prior link).
  */
 export async function linkStudentByCode(studentUserId: string, code: string) {
-  const tutor = await prisma.tutorProfile.findUnique({
-    where: { inviteCode: code },
-    include: { user: { select: { id: true, name: true } } },
-  });
+  const [student, tutor] = await Promise.all([
+    prisma.user.findUnique({ where: { id: studentUserId }, select: { role: true } }),
+    prisma.tutorProfile.findFirst({
+      where: { inviteCode: code, user: { role: 'tutor' } },
+      include: { user: { select: { id: true, name: true } } },
+    }),
+  ]);
+  if (!student || (student.role !== 'learner' && student.role !== 'student')) {
+    throw new ForbiddenError('Only learner accounts can connect to a tutor');
+  }
   if (!tutor) throw new InviteCodeNotFoundError();
-  await prisma.tutorStudent.upsert({
-    where: { tutorId_studentId: { tutorId: tutor.id, studentId: studentUserId } },
-    update: { status: 'active', endedAt: null },
-    create: { tutorId: tutor.id, studentId: studentUserId, status: 'active' },
-  });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.tutorStudent.updateMany({
+          where: { studentId: studentUserId, status: 'active' },
+          data: { status: 'ended', endedAt: new Date() },
+        });
+        await tx.tutorStudent.upsert({
+          where: { tutorId_studentId: { tutorId: tutor.id, studentId: studentUserId } },
+          update: { status: 'active', endedAt: null, connectedAt: new Date() },
+          create: { tutorId: tutor.id, studentId: studentUserId, status: 'active' },
+        });
+      });
+      break;
+    } catch (error) {
+      const code = (error as { code?: string }).code;
+      if (attempt === 0 && (code === 'P2002' || code === 'P2034')) continue;
+      if (code === 'P2002' || code === 'P2034') {
+        throw new ConflictError('Tutor connection changed concurrently; please retry');
+      }
+      throw error;
+    }
+  }
   await emitUserEvent(studentUserId, 'TutorLinked', {
     tutorUserId: tutor.userId,
     tutorName: tutor.user.name,
@@ -184,7 +209,7 @@ export async function listStudentsForTutor(tutorUserId: string): Promise<Student
             select: { completedAt: true },
           },
           directivesReceived: {
-            where: { status: 'active' },
+            where: { status: 'active', tutorId: tutor.id },
             select: { id: true },
           },
         },
@@ -305,6 +330,17 @@ export interface CreateDirectiveInput {
   replaceExisting?: boolean;
 }
 
+async function validatePinnedSkills(pinned: string[]) {
+  if (pinned.length === 0) return;
+  const found = await prisma.curriculumSkill.findMany({
+    where: { id: { in: pinned }, isActive: true },
+    select: { id: true },
+  });
+  const foundSet = new Set(found.map((skill) => skill.id));
+  const missing = pinned.filter((id) => !foundSet.has(id));
+  if (missing.length > 0) throw new NotFoundError('One or more pinned skills do not exist');
+}
+
 export async function createDirective(
   tutorUserId: string,
   studentId: string,
@@ -319,33 +355,25 @@ export async function createDirective(
   // Validate pinned skills exist (defense in depth — the UI picker
   // shouldn't be able to send garbage but we don't trust the client).
   const pinned = input.pinnedSkillIds ?? [];
-  if (pinned.length > 0) {
-    const found = await prisma.curriculumSkill.findMany({
-      where: { id: { in: pinned } },
-      select: { id: true },
-    });
-    const foundSet = new Set(found.map((s) => s.id));
-    const missing = pinned.filter((id) => !foundSet.has(id));
-    if (missing.length > 0) throw new Error(`Invalid skill IDs: ${missing.join(', ')}`);
-  }
+  await validatePinnedSkills(pinned);
 
-  // Archive existing actives if requested (default true)
-  if (input.replaceExisting !== false) {
-    await prisma.tutorDirective.updateMany({
-      where: { tutorId: tutor.id, studentId, status: 'active' },
-      data: { status: 'archived', updatedAt: new Date() },
+  const created = await prisma.$transaction(async (tx) => {
+    if (input.replaceExisting !== false) {
+      await tx.tutorDirective.updateMany({
+        where: { tutorId: tutor.id, studentId, status: 'active' },
+        data: { status: 'archived', updatedAt: new Date() },
+      });
+    }
+    return tx.tutorDirective.create({
+      data: {
+        tutorId: tutor.id,
+        studentId,
+        body: input.body,
+        pinnedSkillIds: pinned,
+        expiresAt: input.expiresAt ?? null,
+        status: 'active',
+      },
     });
-  }
-
-  const created = await prisma.tutorDirective.create({
-    data: {
-      tutorId: tutor.id,
-      studentId,
-      body: input.body,
-      pinnedSkillIds: pinned,
-      expiresAt: input.expiresAt ?? null,
-      status: 'active',
-    },
   });
 
   await emitUserEvent(studentId, 'TutorDirectiveIssued', {
@@ -360,7 +388,7 @@ export async function createDirective(
 export async function archiveDirective(tutorUserId: string, directiveId: string) {
   const tutor = await getTutorProfile(tutorUserId);
   const dir = await prisma.tutorDirective.findUnique({ where: { id: directiveId } });
-  if (!dir || dir.tutorId !== tutor.id) throw new Error('Directive not found');
+  if (!dir || dir.tutorId !== tutor.id) throw new NotFoundError('Directive not found');
   const updated = await prisma.tutorDirective.update({
     where: { id: directiveId },
     data: { status: 'archived' },
@@ -370,6 +398,28 @@ export async function archiveDirective(tutorUserId: string, directiveId: string)
     tutorUserId,
   });
   return updated;
+}
+
+export async function updateDirective(
+  tutorUserId: string,
+  directiveId: string,
+  patch: {
+    body?: string;
+    pinnedSkillIds?: string[];
+    expiresAt?: Date | null;
+    status?: DirectiveStatus;
+  },
+) {
+  const tutor = await getTutorProfile(tutorUserId);
+  const directive = await prisma.tutorDirective.findUnique({ where: { id: directiveId } });
+  if (!directive || directive.tutorId !== tutor.id) {
+    throw new NotFoundError('Directive not found');
+  }
+  if (patch.pinnedSkillIds) await validatePinnedSkills(patch.pinnedSkillIds);
+  return prisma.tutorDirective.update({
+    where: { id: directiveId },
+    data: patch,
+  });
 }
 
 /**
@@ -385,7 +435,14 @@ export async function getActiveDirectiveForStudent(studentId: string) {
     data: { status: 'archived' },
   });
   const dir = await prisma.tutorDirective.findFirst({
-    where: { studentId, status: 'active' },
+    where: {
+      studentId,
+      status: 'active',
+      tutor: {
+        user: { role: 'tutor' },
+        students: { some: { studentId, status: 'active' } },
+      },
+    },
     orderBy: { createdAt: 'desc' },
   });
   if (!dir) return null;

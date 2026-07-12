@@ -15,6 +15,12 @@ test('onboarding orb tap: trace the full network + console flow', async ({
   test.skip(testInfo.project.name !== 'desktop', 'desktop only');
   await authenticate(context, baseURL!);
 
+  const availability = await context.request.get(`${baseURL}/api/voice/availability`);
+  const voice = availability.ok()
+    ? ((await availability.json()) as { available?: boolean }).available
+    : false;
+  test.skip(!voice, 'voice provider unavailable in this environment');
+
   // Capture console + network with timestamps
   const events: { t: number; kind: string; detail: string }[] = [];
   const t0 = Date.now();
@@ -38,7 +44,7 @@ test('onboarding orb tap: trace the full network + console flow', async ({
   // Find the orb. There's only one big button on this page in intro state.
   const orb = page
     .locator(
-      ['button[aria-label*="Tap to begin" i]', 'button[aria-label*="Voice orb" i]'].join(', '),
+      ['button[aria-label*="Tap to begin" i]', 'button[aria-label*="Voice presence" i]'].join(', '),
     )
     .first();
   await expect(orb).toBeVisible();

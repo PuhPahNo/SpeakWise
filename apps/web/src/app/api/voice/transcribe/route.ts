@@ -1,4 +1,5 @@
-import { getOrCreateUser } from '@/lib/auth/current-user';
+import { UnauthenticatedError, getOrCreateUser } from '@/lib/auth/current-user';
+import { userRateLimitResponse } from '@/lib/security/rate-limit';
 import { transcribeAudio } from '@speakwise/ai';
 import { NextResponse } from 'next/server';
 
@@ -7,7 +8,9 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    await getOrCreateUser();
+    const user = await getOrCreateUser();
+    const limited = userRateLimitResponse('voice-transcribe', user.id, 30, 15 * 60_000);
+    if (limited) return limited;
     const form = await req.formData();
     const file = form.get('audio');
     // Language hint:
@@ -21,6 +24,12 @@ export async function POST(req: Request) {
     if (!(file instanceof Blob)) {
       return NextResponse.json({ error: 'audio file required' }, { status: 400 });
     }
+    if (file.size > 15 * 1024 * 1024) {
+      return NextResponse.json({ error: 'audio_too_large' }, { status: 413 });
+    }
+    if (file.type && !file.type.startsWith('audio/')) {
+      return NextResponse.json({ error: 'invalid_audio_type' }, { status: 415 });
+    }
     const buf = await file.arrayBuffer();
     const result = await transcribeAudio({
       audio: buf,
@@ -29,9 +38,12 @@ export async function POST(req: Request) {
     });
     return NextResponse.json(result);
   } catch (e) {
+    if (e instanceof UnauthenticatedError) {
+      return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
+    }
     console.error('transcribe error', e);
     return NextResponse.json(
-      { error: 'transcribe_failed', message: e instanceof Error ? e.message : 'unknown' },
+      { error: 'transcribe_failed', message: 'Transcription failed. Please retry.' },
       { status: 500 },
     );
   }

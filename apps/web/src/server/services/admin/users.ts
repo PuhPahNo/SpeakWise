@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { ConflictError, NotFoundError } from '@/lib/api/route-handler';
+import { ConflictError, NotFoundError } from '@/lib/api/errors';
 import { hashPassword } from '@/lib/auth/password';
 import { ensureProfile, updateProfile } from '@/server/services/profile';
 import { type Prisma, prisma } from '@speakwise/db';
@@ -19,7 +19,7 @@ function generateInviteCode(): string {
   const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   const buf = randomBytes(8);
   let code = '';
-  for (let i = 0; i < 8; i++) code += alphabet[buf[i]! % alphabet.length];
+  for (let i = 0; i < 8; i++) code += alphabet[(buf[i] ?? 0) % alphabet.length];
   return code;
 }
 
@@ -177,7 +177,7 @@ export async function createUser(
   });
   if (dupe) throw new ConflictError(`Username "${username}" is already taken`);
 
-  const email = input.email?.trim() ? input.email.trim() : null;
+  const email = input.email?.trim() ? input.email.trim().toLowerCase() : null;
   if (email) {
     const emailDupe = await prisma.user.findFirst({ where: { email }, select: { id: true } });
     if (emailDupe) throw new ConflictError(`Email "${email}" is already in use`);
@@ -236,7 +236,7 @@ export async function updateUser(
   const data: Prisma.UserUpdateInput = {};
   if (patch.username !== undefined) data.username = patch.username;
   if (patch.name !== undefined) data.name = patch.name;
-  if (patch.email !== undefined) data.email = patch.email ? patch.email.trim() : null;
+  if (patch.email !== undefined) data.email = patch.email ? patch.email.trim().toLowerCase() : null;
   if (patch.role !== undefined) data.role = patch.role;
   if (patch.timezone !== undefined) data.timezone = patch.timezone;
   if (patch.nativeLanguage !== undefined) data.nativeLanguage = patch.nativeLanguage;
@@ -255,7 +255,11 @@ export async function updateUser(
   // Make sure a role change lands the user a sensible profile row.
   if (patch.role && patch.role !== target.role) {
     if (patch.role === 'tutor') await ensureTutorProfile(userId);
-    else if (patch.role === 'learner') {
+    else if (
+      patch.role === 'learner' ||
+      patch.role === 'student' ||
+      patch.role === 'organization_admin'
+    ) {
       const has = await prisma.learnerProfile.findUnique({ where: { userId } });
       if (!has) await prisma.learnerProfile.create({ data: { userId } });
     }

@@ -13,8 +13,9 @@ describe('authed read-only endpoints', () => {
       user: { id: string; username: string; name: string; role: string };
       learnerProfile: { onboardingCompleted: boolean };
     }>('GET', '/api/me', { cookie, expectStatus: 200 });
-    expect(data.user.username).toBe('anthony');
-    expect(data.user.role).toBe('admin');
+    expect(data.user.username).toBe(process.env.TEST_USERNAME);
+    expect(data.user.role).toBe(process.env.TEST_ROLE ?? 'learner');
+    expect('passwordHash' in data.user).toBe(false);
     expect(typeof data.learnerProfile.onboardingCompleted).toBe('boolean');
   });
 

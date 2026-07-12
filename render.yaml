@@ -28,9 +28,9 @@ services:
     # but prisma/tsx/typescript/tailwind are devDeps needed at build + pre-deploy.
     buildCommand: npm install -g pnpm@9.12.0 && pnpm install --frozen-lockfile --prod=false && pnpm --filter @speakwise/db prisma:generate && pnpm --filter speakwise-web build
     # Runs after build, before the new version goes live, with DB + env access.
-    # No migrations in this repo — schema is applied via `prisma db push`; the
-    # seed (curriculum + prompts) is idempotent. Both safe to run every deploy.
-    preDeployCommand: pnpm --filter @speakwise/db exec prisma db push && pnpm --filter @speakwise/db exec tsx src/seed.ts
+    # The migration helper safely baselines databases created before migration
+    # history was introduced, then applies versioned migrations normally.
+    preDeployCommand: pnpm exec tsx scripts/migrate-deploy.ts && pnpm --filter @speakwise/db exec tsx src/seed.ts
     startCommand: pnpm --filter speakwise-web start
     healthCheckPath: /api/health
     autoDeploy: true
@@ -72,16 +72,6 @@ services:
         sync: false
       - key: ELEVENLABS_MODEL_ID
         value: eleven_turbo_v2_5
-      - key: SENTRY_DSN
-        sync: false
-      - key: NEXT_PUBLIC_SENTRY_DSN
-        sync: false
-      - key: POSTHOG_API_KEY
-        sync: false
-      - key: NEXT_PUBLIC_POSTHOG_KEY
-        sync: false
-      - key: NEXT_PUBLIC_POSTHOG_HOST
-        value: https://us.i.posthog.com
       # Still used to protect the /api/cron/* endpoints for manual/forced runs.
       # The in-process scheduler calls the job logic directly (no HTTP, no secret).
       - key: CRON_SECRET

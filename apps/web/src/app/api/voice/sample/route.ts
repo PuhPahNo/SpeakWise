@@ -1,4 +1,5 @@
-import { getOrCreateUser } from '@/lib/auth/current-user';
+import { withAuthAndJson } from '@/lib/api/route-handler';
+import { userRateLimitResponse } from '@/lib/security/rate-limit';
 import { getVoiceById, synthesizeSpeech } from '@speakwise/ai';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -17,9 +18,9 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
-  try {
-    await getOrCreateUser();
-    const body = Schema.parse(await req.json());
+  return withAuthAndJson(Schema, req, async ({ userId }, body) => {
+    const limited = userRateLimitResponse('voice-sample', userId, 20, 15 * 60_000);
+    if (limited) return limited;
     if (!getVoiceById(body.voiceId)) {
       return NextResponse.json({ error: 'unknown_voice_id' }, { status: 400 });
     }
@@ -36,11 +37,5 @@ export async function POST(req: Request) {
         'Cache-Control': 'private, max-age=3600',
       },
     });
-  } catch (e) {
-    console.error('voice sample error', e);
-    return NextResponse.json(
-      { error: 'sample_failed', message: e instanceof Error ? e.message : 'unknown' },
-      { status: 500 },
-    );
-  }
+  });
 }

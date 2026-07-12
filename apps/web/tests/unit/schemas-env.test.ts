@@ -1,4 +1,5 @@
 import { PublicEnvSchema, ServerEnvSchema } from '@speakwise/schemas';
+import { PatchMeRequestSchema } from '@speakwise/schemas';
 import { describe, expect, it } from 'vitest';
 
 const VALID_SERVER = {
@@ -49,8 +50,20 @@ describe('PublicEnvSchema', () => {
     expect(r.success).toBe(false);
   });
 
-  it('does NOT require Clerk vars (in-house auth)', () => {
+  it('requires only the public app URL', () => {
     const r = PublicEnvSchema.safeParse({ NEXT_PUBLIC_APP_URL: 'http://localhost:3001' });
     expect(r.success).toBe(true);
+  });
+});
+
+describe('PatchMeRequestSchema timezone', () => {
+  it('accepts an IANA timezone', () => {
+    expect(PatchMeRequestSchema.safeParse({ timezone: 'America/New_York' }).success).toBe(true);
+  });
+
+  it('rejects an invalid timezone', () => {
+    expect(PatchMeRequestSchema.safeParse({ timezone: 'Moon/Sea_of_Tranquility' }).success).toBe(
+      false,
+    );
   });
 });

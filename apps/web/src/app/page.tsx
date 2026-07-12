@@ -1,11 +1,15 @@
 import { VoiceOrb } from '@/components/voice/voice-orb';
-import { readSession } from '@/lib/auth/session';
+import { UnauthenticatedError, getCurrentUser } from '@/lib/auth/current-user';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 export default async function HomePage() {
-  const session = await readSession();
-  if (session?.userId) redirect('/command-center');
+  try {
+    await getCurrentUser();
+    redirect('/command-center');
+  } catch (error) {
+    if (!(error instanceof UnauthenticatedError)) throw error;
+  }
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center px-5 py-16">

@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, Volume2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 interface Card {
   id: string;
@@ -20,6 +20,8 @@ export function VocabReview({ cards }: { cards: Card[] }) {
   const [pending, setPending] = useState(false);
   const [stats, setStats] = useState({ correct: 0, incorrect: 0 });
   const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const reviewTokens = useRef(new Map<string, string>());
 
   const card = cards[index];
 
@@ -44,12 +46,17 @@ export function VocabReview({ cards }: { cards: Card[] }) {
   async function record(result: 'correct' | 'incorrect') {
     if (!card || pending) return;
     setPending(true);
+    setError(null);
     try {
-      await fetch(`/api/vocabulary/${card.id}/review`, {
+      const reviewToken = reviewTokens.current.get(card.id) ?? crypto.randomUUID();
+      reviewTokens.current.set(card.id, reviewToken);
+      const response = await fetch(`/api/vocabulary/${card.id}/review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ result }),
+        body: JSON.stringify({ result, reviewToken }),
       });
+      if (!response.ok) throw new Error('Could not save that review. Please retry.');
+      reviewTokens.current.delete(card.id);
       setStats((s) => ({
         correct: s.correct + (result === 'correct' ? 1 : 0),
         incorrect: s.incorrect + (result === 'incorrect' ? 1 : 0),
@@ -60,6 +67,8 @@ export function VocabReview({ cards }: { cards: Card[] }) {
         setIndex(index + 1);
         setRevealed(false);
       }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not save that review.');
     } finally {
       setPending(false);
     }
@@ -75,12 +84,14 @@ export function VocabReview({ cards }: { cards: Card[] }) {
         </div>
         <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
           <button
+            type="button"
             onClick={() => router.push('/vocabulary')}
             className="rounded-full surface text-ink-50 px-6 py-3 hover:border-wise-500/40"
           >
             See all words
           </button>
           <button
+            type="button"
             onClick={() => router.push('/command-center')}
             className="rounded-full bg-wise-500 hover:bg-wise-600 text-ink-900 font-medium px-6 py-3"
           >
@@ -110,6 +121,12 @@ export function VocabReview({ cards }: { cards: Card[] }) {
           style={{ width: `${((index + (revealed ? 1 : 0)) / cards.length) * 100}%` }}
         />
       </div>
+
+      {error && (
+        <p role="alert" className="text-sm text-red-300">
+          {error}
+        </p>
+      )}
 
       <AnimatePresence mode="wait">
         <motion.button
@@ -171,6 +188,7 @@ export function VocabReview({ cards }: { cards: Card[] }) {
           className="flex gap-3 w-full max-w-md"
         >
           <button
+            type="button"
             onClick={() => void record('incorrect')}
             disabled={pending}
             className="flex-1 inline-flex items-center justify-center gap-2 rounded-full surface text-ink-50 px-5 py-3 hover:border-wise-500/40 transition disabled:opacity-50"
@@ -178,6 +196,7 @@ export function VocabReview({ cards }: { cards: Card[] }) {
             <X size={16} /> Forgot
           </button>
           <button
+            type="button"
             onClick={() => void record('correct')}
             disabled={pending}
             className="flex-1 inline-flex items-center justify-center gap-2 rounded-full bg-wise-500 hover:bg-wise-600 text-ink-900 font-medium px-5 py-3 disabled:opacity-50"

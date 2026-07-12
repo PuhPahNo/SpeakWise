@@ -6,11 +6,14 @@
 const BASE = process.env.APP_URL ?? 'http://localhost:3001';
 
 const TEST_USER = {
-  username: process.env.TEST_USERNAME ?? 'anthony',
-  password: process.env.TEST_PASSWORD ?? 'admin123',
+  username: process.env.TEST_USERNAME ?? '',
+  password: process.env.TEST_PASSWORD ?? '',
 };
 
 export async function signInForTests(): Promise<string> {
+  if (!TEST_USER.username || !TEST_USER.password) {
+    throw new Error('TEST_USERNAME and TEST_PASSWORD are required for integration tests');
+  }
   const res = await fetch(`${BASE}/api/auth/signin`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

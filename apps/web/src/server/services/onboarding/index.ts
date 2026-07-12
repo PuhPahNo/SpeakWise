@@ -1,5 +1,6 @@
+import { ConflictError } from '@/lib/api/errors';
 import { Models, chatStructured } from '@speakwise/ai';
-import { type CEFRLevel, type SessionMode, prisma } from '@speakwise/db';
+import { type CEFRLevel, type Prisma, type SessionMode, prisma } from '@speakwise/db';
 import { emitUserEvent } from '@speakwise/events';
 import { PlacementAssessmentOutputSchema } from '@speakwise/schemas';
 import { z } from 'zod';
@@ -59,17 +60,34 @@ const OnboardingTurnSchema = z.object({
 
 export async function startOnboarding(userId: string, mode: SessionMode) {
   await ensureProfile(userId);
-  const session = await prisma.session.create({
-    data: { userId, sessionType: 'onboarding', mode, status: 'active' },
-  });
-  await emitUserEvent(userId, 'OnboardingStarted', {
-    mode: mode === 'voice' ? 'voice' : 'text',
+  const existing = await prisma.session.findFirst({
+    where: { userId, sessionType: 'onboarding', status: 'active' },
+    orderBy: { startedAt: 'desc' },
   });
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   const firstName = user.name.split(' ')[0] ?? user.name;
+  const wiseMessage = `Ciao ${firstName}, I'm Wise. I'll be your Italian tutor. In a minute or two I'll learn enough about you to build a plan that fits — let's start: what's drawing you to Italian?`;
+  if (existing) return { sessionId: existing.id, wiseMessage };
+
+  let session: Prisma.SessionGetPayload<Record<string, never>>;
+  try {
+    session = await prisma.session.create({
+      data: { userId, sessionType: 'onboarding', mode, status: 'active' },
+    });
+    await emitUserEvent(userId, 'OnboardingStarted', {
+      mode: mode === 'voice' ? 'voice' : 'text',
+    });
+  } catch (error) {
+    const concurrent = await prisma.session.findFirst({
+      where: { userId, sessionType: 'onboarding', status: 'active' },
+      orderBy: { startedAt: 'desc' },
+    });
+    if (!concurrent) throw error;
+    session = concurrent;
+  }
   return {
     sessionId: session.id,
-    wiseMessage: `Ciao ${firstName}, I'm Wise. I'll be your Italian tutor. In a minute or two I'll learn enough about you to build a plan that fits — let's start: what's drawing you to Italian?`,
+    wiseMessage,
   };
 }
 
@@ -78,6 +96,7 @@ export async function respondOnboarding(userId: string, sessionId: string, text:
     where: { id: sessionId, userId, sessionType: 'onboarding' },
   });
   if (!session) throw new Error('Onboarding session not found');
+  if (session.status !== 'active') throw new ConflictError('Onboarding session is complete');
 
   const transcript = (session.transcript as Array<{ role: string; text: string }> | null) ?? [];
   transcript.push({ role: 'user', text });

@@ -1,8 +1,9 @@
 import { MobileTabBar } from '@/components/ui/mobile-tab-bar';
 import { type RailItem, SideRail } from '@/components/ui/side-rail';
 import { TopBar } from '@/components/ui/top-bar';
-import { getCurrentUser } from '@/lib/auth/current-user';
+import { UnauthenticatedError, getCurrentUser } from '@/lib/auth/current-user';
 import { prisma } from '@speakwise/db';
+import { redirect } from 'next/navigation';
 
 /**
  * One language per nav label, by the learner's ratio band:
@@ -23,7 +24,10 @@ const LEVEL_CODE: Record<string, string> = {
 };
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const user = await getCurrentUser();
+  const user = await getCurrentUser().catch((error) => {
+    if (error instanceof UnauthenticatedError) redirect('/sign-in');
+    throw error;
+  });
   const isTutor = user.role === 'tutor';
 
   let ratio = 0;

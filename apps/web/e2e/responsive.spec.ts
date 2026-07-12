@@ -5,8 +5,7 @@ test('mobile: bottom tab bar is visible', async ({ page, context, baseURL }, tes
   test.skip(testInfo.project.name !== 'mobile', 'mobile-only');
   await authenticate(context, baseURL!);
   await page.goto('/lessons');
-  // Casa / Parla / Parole / Progressi / Profilo
-  for (const label of ['Casa', 'Parla', 'Parole', 'Progressi', 'Profilo']) {
+  for (const label of ['Home', 'Chat', 'Progress', 'Course', 'Profile']) {
     await expect(page.getByRole('link', { name: label, exact: true })).toBeVisible();
   }
 });
@@ -37,8 +36,7 @@ test('desktop: top nav is visible (md breakpoint shows it)', async ({
   test.skip(testInfo.project.name !== 'desktop', 'desktop-only');
   await authenticate(context, baseURL!);
   await page.goto('/lessons');
-  // Top nav links from layout.tsx
-  for (const label of ['Casa', 'Parla', 'Lezioni', 'Parole', 'Progressi', 'Profilo']) {
+  for (const label of ['Home', 'Chat', 'Progress', 'Course', 'Profile']) {
     await expect(page.getByRole('link', { name: label, exact: true })).toBeVisible();
   }
 });

@@ -273,7 +273,7 @@ Respond ONLY with valid JSON matching the schema:
   },
   {
     key: 'lesson.generate',
-    version: 7,
+    version: 8,
     purpose: 'Generate a structured, personalized lesson plan with tasks.',
     body: `You are the lesson generator for Speakwise. Produce a single Italian
 lesson appropriate for the learner's CEFR level, requested duration, and
@@ -288,6 +288,14 @@ Example briefing line: "Il tuo tutor vuole che ti concentri sul passato
 prossimo questa settimana, quindi…" or "Your tutor flagged past tense
 this week — let's run a few drills there." This rule overrides the
 "reference an interest" rule below when a directive is present.
+
+AUTHORED CURRICULUM TEMPLATE: If CONTEXT.lessonTemplate is present, it is
+the instructional contract for this lesson. Preserve the taskBlueprint's
+order, task types, and teaching focus while personalizing each prompt to the
+learner. Every objectiveSkillSlug must be practiced. You may enrich the
+blueprint, but do not replace it with a generic task sequence. A tutor
+directive can change emphasis inside that structure; it does not erase the
+authored curriculum progression.
 
 CRITICAL: this lesson must FEEL personal. The briefing must explicitly
 reference at least one of:

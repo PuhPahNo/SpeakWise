@@ -58,9 +58,11 @@ export async function reviewVocabulary(
   userId: string,
   vocabId: string,
   result: 'correct' | 'incorrect',
+  reviewToken?: string,
 ) {
   const prev = await prisma.vocabularyItem.findFirst({ where: { id: vocabId, userId } });
   if (!prev) throw new Error('Vocabulary item not found');
+  if (reviewToken && prev.lastReviewToken === reviewToken) return prev;
 
   const oldScore = Number(prev.masteryScore);
   const delta = result === 'correct' ? 0.15 : -0.1;
@@ -78,8 +80,14 @@ export async function reviewVocabulary(
   else if (newScore >= 0.4) status = 'review';
   else status = 'learning';
 
-  const updated = await prisma.vocabularyItem.update({
-    where: { id: vocabId },
+  const claimed = await prisma.vocabularyItem.updateMany({
+    where: {
+      id: vocabId,
+      userId,
+      ...(reviewToken
+        ? { OR: [{ lastReviewToken: null }, { lastReviewToken: { not: reviewToken } }] }
+        : {}),
+    },
     data: {
       masteryScore: newScore,
       correctCount,
@@ -88,8 +96,13 @@ export async function reviewVocabulary(
       lastReviewedAt: new Date(),
       nextReviewAt,
       status,
+      lastReviewToken: reviewToken,
     },
   });
+  if (claimed.count === 0) {
+    return prisma.vocabularyItem.findFirstOrThrow({ where: { id: vocabId, userId } });
+  }
+  const updated = await prisma.vocabularyItem.findUniqueOrThrow({ where: { id: vocabId } });
 
   await emitUserEvent(userId, 'VocabularyReviewed', {
     vocabId,

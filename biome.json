@@ -46,6 +46,14 @@
           "suspicious": { "noExplicitAny": "off" }
         }
       }
+    },
+    {
+      "include": ["scripts/qa-*.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": { "noExplicitAny": "off" }
+        }
+      }
     }
   ],
   "javascript": {

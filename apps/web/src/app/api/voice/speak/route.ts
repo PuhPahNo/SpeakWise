@@ -1,7 +1,7 @@
-import { getOrCreateUser } from '@/lib/auth/current-user';
+import { withAuthAndJson } from '@/lib/api/route-handler';
+import { userRateLimitResponse } from '@/lib/security/rate-limit';
 import { ensureProfile } from '@/server/services/profile';
 import { synthesizeSpeech } from '@speakwise/ai';
-import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 const Schema = z.object({
@@ -18,10 +18,10 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
-  try {
-    const user = await getOrCreateUser();
-    const body = Schema.parse(await req.json());
-    const profile = await ensureProfile(user.id);
+  return withAuthAndJson(Schema, req, async ({ userId }, body) => {
+    const limited = userRateLimitResponse('voice-speak', userId, 60, 15 * 60_000);
+    if (limited) return limited;
+    const profile = await ensureProfile(userId);
     const result = await synthesizeSpeech({
       text: body.text,
       language: body.language,
@@ -33,11 +33,5 @@ export async function POST(req: Request) {
         'Cache-Control': 'private, max-age=0, must-revalidate',
       },
     });
-  } catch (e) {
-    console.error('tts error', e);
-    return NextResponse.json(
-      { error: 'tts_failed', message: e instanceof Error ? e.message : 'unknown' },
-      { status: 500 },
-    );
-  }
+  });
 }

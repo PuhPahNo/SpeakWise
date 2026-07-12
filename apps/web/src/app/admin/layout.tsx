@@ -1,5 +1,5 @@
 import { UserMenu } from '@/components/ui/user-menu';
-import { getOrCreateUser } from '@/lib/auth/current-user';
+import { UnauthenticatedError, getOrCreateUser } from '@/lib/auth/current-user';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { AdminNav } from './admin-nav';
@@ -8,7 +8,10 @@ export const dynamic = 'force-dynamic';
 
 /** Single admin gate for everything under /admin. */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const user = await getOrCreateUser();
+  const user = await getOrCreateUser().catch((error) => {
+    if (error instanceof UnauthenticatedError) redirect('/sign-in');
+    throw error;
+  });
   if (user.role !== 'admin') redirect('/command-center');
 
   return (

@@ -1,9 +1,15 @@
+import { ConflictError, NotFoundError } from '@/lib/api/errors';
 import { Models, chatStructured } from '@speakwise/ai';
-import { type CEFRLevel, type LessonAuthor, type LessonType, prisma } from '@speakwise/db';
+import { type CEFRLevel, type LessonAuthor, type LessonType, Prisma, prisma } from '@speakwise/db';
 import { emitUserEvent } from '@speakwise/events';
 import { LessonGenerationOutputSchema } from '@speakwise/schemas';
 import { getActiveDirectiveForStudent } from '../classroom';
-import { getActiveSkills, getSkillsBySlugs, getSkillsDueForReview } from '../curriculum';
+import {
+  getActiveSkills,
+  getSkillsBySlugs,
+  getSkillsDueForReview,
+  materializeUnitVocabularyForUser,
+} from '../curriculum';
 import { listMemory } from '../memory';
 import { getWiseProfileSummary } from '../profile';
 
@@ -20,11 +26,38 @@ export interface GenerateLessonInput {
    * of looking up the student's active one. Used by the harness/admin.
    */
   tutorDirectiveId?: string;
+  /** Authored curriculum shape to personalize, rather than an unstructured lesson request. */
+  lessonTemplateSlug?: string;
+  /** Internal retry key for flows that must produce exactly one lesson. */
+  idempotencyKey?: string;
 }
 
 export async function generateLesson(input: GenerateLessonInput) {
+  if (input.idempotencyKey) {
+    const existing = await prisma.lesson.findFirst({
+      where: {
+        userId: input.userId,
+        generationContext: { path: ['idempotencyKey'], equals: input.idempotencyKey },
+      },
+      include: { tasks: { orderBy: { orderIndex: 'asc' } } },
+    });
+    if (existing) return existing;
+  }
   const profile = await getWiseProfileSummary(input.userId);
   if (!profile) throw new Error('Learner profile not found — onboarding required first.');
+
+  const lessonTemplate = input.lessonTemplateSlug
+    ? await prisma.curriculumLessonTemplate.findFirst({
+        where: { slug: input.lessonTemplateSlug, isActive: true },
+        include: { unit: true },
+      })
+    : null;
+  if (input.lessonTemplateSlug && !lessonTemplate) {
+    throw new NotFoundError('Lesson template not found');
+  }
+  if (lessonTemplate && lessonTemplate.lessonType !== input.lessonType) {
+    throw new ConflictError('Lesson type does not match the selected curriculum template');
+  }
 
   // Pull the student's active tutor directive (if any). When present
   // AND the directive has pinned skills, those override the default
@@ -64,6 +97,10 @@ export async function generateLesson(input: GenerateLessonInput) {
           where: { id: { in: directive.pinnedSkillIds } },
         })
       : (await getActiveSkills(input.userId)).slice(0, 5);
+
+  if (lessonTemplate?.objectiveSkillSlugs.length) {
+    targetSkills = await getSkillsBySlugs(lessonTemplate.objectiveSkillSlugs);
+  }
 
   if (targetSkills.length === 0) {
     // First-ever lesson: pick any skill at the learner's level
@@ -107,8 +144,9 @@ export async function generateLesson(input: GenerateLessonInput) {
         select: { id: true, code: true, title: true, theme: true, canDo: true },
       })
     : [];
-  const primaryUnit =
-    units.length > 0
+  const primaryUnit = lessonTemplate
+    ? lessonTemplate.unit
+    : units.length > 0
       ? (units
           .map((u) => ({ u, n: targetSkills.filter((s) => s.unitId === u.id).length }))
           .sort((a, b) => b.n - a.n)[0]?.u ?? null)
@@ -155,6 +193,15 @@ export async function generateLesson(input: GenerateLessonInput) {
           pinnedSkills: directive.pinnedSkills.map((s) => ({ slug: s.slug, name: s.name })),
         }
       : null,
+    lessonTemplate: lessonTemplate
+      ? {
+          slug: lessonTemplate.slug,
+          title: lessonTemplate.title,
+          summary: lessonTemplate.summary,
+          objectiveSkillSlugs: lessonTemplate.objectiveSkillSlugs,
+          taskBlueprint: lessonTemplate.taskBlueprint,
+        }
+      : null,
   };
 
   const request = {
@@ -162,7 +209,10 @@ export async function generateLesson(input: GenerateLessonInput) {
     // Prefer the explicit duration; otherwise warm-up beginners with shorter
     // lessons. The previous form had a precedence bug — the ?? was binding
     // before the comparison and forcing a boolean → 8.
-    durationMinutes: input.durationMinutes ?? (profile.level === 'complete_beginner' ? 8 : 12),
+    durationMinutes:
+      input.durationMinutes ??
+      lessonTemplate?.defaultDurationMinutes ??
+      (profile.level === 'complete_beginner' ? 8 : 12),
     interestTheme: input.interestTheme ?? null,
     userRequest: input.userRequest ?? null,
   };
@@ -186,6 +236,23 @@ export async function generateLesson(input: GenerateLessonInput) {
 
   const ai = result.data;
 
+  if (primaryUnit) {
+    await materializeUnitVocabularyForUser(input.userId, primaryUnit.code);
+  }
+
+  const vocabularyTargets = [
+    ...new Set(ai.tasks.flatMap((task) => task.vocabularyTargets).map((text) => text.trim())),
+  ].filter(Boolean);
+  const vocabularyItems = vocabularyTargets.length
+    ? await prisma.vocabularyItem.findMany({
+        where: { userId: input.userId },
+        select: { id: true, targetText: true },
+      })
+    : [];
+  const vocabularyIdByText = new Map(
+    vocabularyItems.map((item) => [item.targetText.trim().toLowerCase(), item.id]),
+  );
+
   const aiSlugToId = new Map(targetSkills.map((s) => [s.slug, s.id]));
   // Allow tasks to reference skills by slug; resolve any missing ones
   const referencedSlugs = new Set(ai.tasks.flatMap((t) => t.skillTags));
@@ -195,62 +262,91 @@ export async function generateLesson(input: GenerateLessonInput) {
     for (const s of extra) aiSlugToId.set(s.slug, s.id);
   }
 
-  const lesson = await prisma.lesson.create({
-    data: {
-      userId: input.userId,
-      title: ai.title,
-      lessonType: input.lessonType,
-      status: 'recommended',
-      targetSkillIds: targetSkills.map((s) => s.id),
-      interestTheme: ai.interestTheme,
-      estimatedDurationMinutes: ai.estimatedDurationMinutes,
-      difficultyLevel: profile.level as CEFRLevel,
-      generationContext: {
-        userRequest: input.userRequest ?? undefined,
-        durationMinutes: input.durationMinutes,
-        interestTheme: input.interestTheme ?? undefined,
-        promptVersion: String(result.usage.promptVersion),
+  let lessonCreated = true;
+  const lesson = await prisma.lesson
+    .create({
+      data: {
+        userId: input.userId,
+        title: ai.title,
+        lessonType: input.lessonType,
+        status: 'recommended',
+        targetSkillIds: targetSkills.map((s) => s.id),
+        interestTheme: ai.interestTheme,
+        estimatedDurationMinutes: ai.estimatedDurationMinutes,
+        difficultyLevel: profile.level as CEFRLevel,
+        generationContext: {
+          userRequest: input.userRequest ?? undefined,
+          durationMinutes: input.durationMinutes,
+          interestTheme: input.interestTheme ?? undefined,
+          lessonTemplateSlug: lessonTemplate?.slug,
+          idempotencyKey: input.idempotencyKey,
+          promptVersion: String(result.usage.promptVersion),
+        },
+        content: { briefing: ai.briefing, recapPlan: ai.recapPlan },
+        // Lessons that came from a tutor directive are attributed to the
+        // tutor, even though Wise actually generated the content. The
+        // tutorDirectiveId provides the audit link back to the directive.
+        createdBy: input.createdBy ?? (directive ? 'tutor' : 'wise'),
+        tutorDirectiveId: directive?.directiveId ?? null,
+        tasks: {
+          create: ai.tasks.map(
+            (t, i): Prisma.LessonTaskCreateWithoutLessonInput => ({
+              taskType: t.taskType,
+              orderIndex: i,
+              prompt: t.prompt,
+              targetSkillIds: t.skillTags
+                .map((slug) => aiSlugToId.get(slug))
+                .filter((v): v is string => Boolean(v)),
+              vocabularyItemIds: t.vocabularyTargets
+                .map((text) => vocabularyIdByText.get(text.trim().toLowerCase()))
+                .filter((value): value is string => Boolean(value)),
+              expectedAnswer:
+                t.expectedAnswer == null
+                  ? Prisma.JsonNull
+                  : (JSON.parse(JSON.stringify(t.expectedAnswer)) as Prisma.InputJsonValue),
+              options:
+                t.options == null
+                  ? Prisma.JsonNull
+                  : (JSON.parse(JSON.stringify(t.options)) as Prisma.InputJsonValue),
+              metadata: {
+                explanation: t.explanation,
+                vocabularyTargets: t.vocabularyTargets,
+                // Multi-turn dialogue script for listening_comprehension tasks
+                // (undefined for everything else). The lesson player reads
+                // this and plays each line with a different voice.
+                script: t.script ?? undefined,
+              } as Prisma.InputJsonValue,
+            }),
+          ),
+        },
       },
-      content: { briefing: ai.briefing, recapPlan: ai.recapPlan },
-      // Lessons that came from a tutor directive are attributed to the
-      // tutor, even though Wise actually generated the content. The
-      // tutorDirectiveId provides the audit link back to the directive.
-      createdBy: input.createdBy ?? (directive ? 'tutor' : 'wise'),
-      tutorDirectiveId: directive?.directiveId ?? null,
-      tasks: {
-        // biome-ignore lint/suspicious/noExplicitAny: Prisma's Json input type
-        // is structurally narrower than what Zod-validated AI output produces;
-        // cast through any to bridge the two.
-        create: ai.tasks.map((t, i): any => ({
-          taskType: t.taskType,
-          orderIndex: i,
-          prompt: t.prompt,
-          targetSkillIds: t.skillTags
-            .map((slug) => aiSlugToId.get(slug))
-            .filter((v): v is string => Boolean(v)),
-          vocabularyItemIds: [],
-          expectedAnswer: t.expectedAnswer ?? null,
-          options: t.options ?? null,
-          metadata: {
-            explanation: t.explanation,
-            vocabularyTargets: t.vocabularyTargets,
-            // Multi-turn dialogue script for listening_comprehension tasks
-            // (undefined for everything else). The lesson player reads
-            // this and plays each line with a different voice.
-            script: t.script ?? undefined,
+      include: { tasks: { orderBy: { orderIndex: 'asc' } } },
+    })
+    .catch(async (error) => {
+      if (input.idempotencyKey && (error as { code?: string }).code === 'P2002') {
+        const concurrent = await prisma.lesson.findFirst({
+          where: {
+            userId: input.userId,
+            generationContext: { path: ['idempotencyKey'], equals: input.idempotencyKey },
           },
-        })),
-      },
-    },
-    include: { tasks: { orderBy: { orderIndex: 'asc' } } },
-  });
+          include: { tasks: { orderBy: { orderIndex: 'asc' } } },
+        });
+        if (concurrent) {
+          lessonCreated = false;
+          return concurrent;
+        }
+      }
+      throw error;
+    });
 
-  await emitUserEvent(input.userId, 'LessonGenerated', {
-    lessonId: lesson.id,
-    lessonType: lesson.lessonType,
-    targetSkillIds: lesson.targetSkillIds,
-    interestTheme: lesson.interestTheme,
-  });
+  if (lessonCreated) {
+    await emitUserEvent(input.userId, 'LessonGenerated', {
+      lessonId: lesson.id,
+      lessonType: lesson.lessonType,
+      targetSkillIds: lesson.targetSkillIds,
+      interestTheme: lesson.interestTheme,
+    });
+  }
 
   await emitUserEvent(input.userId, 'AICall', {
     provider: 'openai',
@@ -296,31 +392,113 @@ export async function startLessonSession(
   mode: 'voice' | 'text' | 'mixed',
 ) {
   const lesson = await getLesson(userId, lessonId);
-  if (!lesson) throw new Error('Lesson not found');
+  if (!lesson) throw new NotFoundError('Lesson not found');
 
-  const session = await prisma.session.create({
-    data: { userId, lessonId, sessionType: 'lesson', mode, status: 'active' },
+  const existing = await prisma.session.findFirst({
+    where: { userId, lessonId, status: 'active' },
+    orderBy: { startedAt: 'desc' },
   });
+  if (existing) {
+    const answered = await prisma.userResponse.findMany({
+      where: { sessionId: existing.id },
+      select: { lessonTaskId: true },
+    });
+    const answeredIds = new Set(answered.flatMap((response) => response.lessonTaskId ?? []));
+    return {
+      session: existing,
+      currentTask: lesson.tasks.find((task) => !answeredIds.has(task.id)) ?? null,
+    };
+  }
+
+  let session: Prisma.SessionGetPayload<Record<string, never>>;
+  try {
+    session = await prisma.session.create({
+      data: { userId, lessonId, sessionType: 'lesson', mode, status: 'active' },
+    });
+  } catch (error) {
+    const concurrent = await prisma.session.findFirst({
+      where: { userId, lessonId, status: 'active' },
+      orderBy: { startedAt: 'desc' },
+    });
+    if (!concurrent) throw error;
+    session = concurrent;
+  }
   await prisma.lesson.update({ where: { id: lessonId }, data: { status: 'active' } });
   await emitUserEvent(userId, 'LessonStarted', { lessonId, sessionId: session.id, mode });
   return { session, currentTask: lesson.tasks[0] ?? null };
 }
 
-export async function completeLessonSession(userId: string, sessionId: string) {
-  const session = await prisma.session.findFirst({
-    where: { id: sessionId, userId },
-    include: { responses: true, lesson: true },
-  });
-  if (!session) throw new Error('Session not found');
+const ANSWERABLE_TASK_TYPES = new Set([
+  'multiple_choice',
+  'fill_blank',
+  'translation',
+  'conjugation',
+  'pronoun_replacement',
+  'tense_selection',
+  'error_correction',
+  'speaking_prompt',
+  'listening_comprehension',
+  'roleplay',
+  'reflection',
+]);
 
-  const completedAt = new Date();
+export async function completeLessonSession(
+  userId: string,
+  sessionId: string,
+  expectedLessonId: string,
+) {
+  const session = await prisma.session.findFirst({
+    where: { id: sessionId, userId, lessonId: expectedLessonId },
+    include: { responses: true, lesson: { include: { tasks: true } } },
+  });
+  if (!session) throw new NotFoundError('Session not found for this lesson');
+
+  const completedAt = session.completedAt ?? new Date();
   const durationSeconds = Math.round((completedAt.getTime() - session.startedAt.getTime()) / 1000);
   const mistakesDetected = session.responses.filter((r) => r.isCorrect === false).length;
+  const answerableTaskIds =
+    session.lesson?.tasks
+      .filter((task) => ANSWERABLE_TASK_TYPES.has(task.taskType))
+      .map((task) => task.id) ?? [];
+  const completedTaskIds = new Set(
+    session.responses.flatMap((response) => response.lessonTaskId ?? []),
+  );
+  const tasksCompleted = answerableTaskIds.filter((taskId) => completedTaskIds.has(taskId)).length;
 
-  await prisma.session.update({
-    where: { id: sessionId },
+  if (session.status === 'completed') {
+    return {
+      sessionId,
+      durationSeconds,
+      tasksCompleted,
+      mistakesDetected,
+      alreadyCompleted: true,
+    };
+  }
+  if (session.status !== 'active') throw new ConflictError('Session is not active');
+  if (answerableTaskIds.some((taskId) => !completedTaskIds.has(taskId))) {
+    throw new ConflictError('Complete all lesson questions before finishing');
+  }
+
+  const claimed = await prisma.session.updateMany({
+    where: { id: sessionId, userId, status: 'active' },
     data: { status: 'completed', completedAt },
   });
+
+  if (claimed.count === 0) {
+    const completed = await prisma.session.findFirst({
+      where: { id: sessionId, userId, status: 'completed' },
+    });
+    if (completed) {
+      return {
+        sessionId,
+        durationSeconds,
+        tasksCompleted,
+        mistakesDetected,
+        alreadyCompleted: true,
+      };
+    }
+    throw new ConflictError('Session could not be completed');
+  }
 
   if (session.lessonId) {
     await prisma.lesson.update({
@@ -333,16 +511,22 @@ export async function completeLessonSession(userId: string, sessionId: string) {
     sessionId,
     lessonId: session.lessonId,
     durationSeconds,
-    tasksCompleted: session.responses.length,
+    tasksCompleted,
     mistakesDetected,
   });
   await emitUserEvent(userId, 'SessionCompleted', {
     sessionId,
     lessonId: session.lessonId,
     durationSeconds,
-    tasksCompleted: session.responses.length,
+    tasksCompleted,
     mistakesDetected,
   });
 
-  return { sessionId, durationSeconds, mistakesDetected };
+  return {
+    sessionId,
+    durationSeconds,
+    tasksCompleted,
+    mistakesDetected,
+    alreadyCompleted: false,
+  };
 }

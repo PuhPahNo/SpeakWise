@@ -55,8 +55,8 @@ export function ProgressNarrative() {
             <p className="text-sm text-ink-200">Building.</p>
           ) : (
             <ul className="space-y-1.5">
-              {report.strengths.map((s, i) => (
-                <li key={i} className="text-sm text-ink-100 leading-snug">
+              {report.strengths.map((s) => (
+                <li key={s} className="text-sm text-ink-100 leading-snug">
                   · {s}
                 </li>
               ))}
@@ -71,8 +71,8 @@ export function ProgressNarrative() {
             <p className="text-sm text-ink-200">Nothing flagged yet.</p>
           ) : (
             <ul className="space-y-1.5">
-              {report.weaknesses.map((s, i) => (
-                <li key={i} className="text-sm text-ink-100 leading-snug">
+              {report.weaknesses.map((s) => (
+                <li key={s} className="text-sm text-ink-100 leading-snug">
                   · {s}
                 </li>
               ))}
@@ -87,8 +87,8 @@ export function ProgressNarrative() {
             What's next
           </div>
           <ul className="space-y-1.5">
-            {report.recommendedNextSteps.map((s, i) => (
-              <li key={i} className="text-sm text-ink-100 leading-snug">
+            {report.recommendedNextSteps.map((s) => (
+              <li key={s} className="text-sm text-ink-100 leading-snug">
                 · {s}
               </li>
             ))}

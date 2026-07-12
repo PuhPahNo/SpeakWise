@@ -1,10 +1,13 @@
 import { withAuthAndJson } from '@/lib/api/route-handler';
+import { userRateLimitResponse } from '@/lib/security/rate-limit';
 import { XP_REWARDS, awardXp } from '@/server/services/gamification';
 import { submitResponse } from '@/server/services/practice';
 import { PracticeRespondRequestSchema } from '@speakwise/schemas';
 
 export async function POST(req: Request) {
   return withAuthAndJson(PracticeRespondRequestSchema, req, async ({ userId }, body) => {
+    const limited = userRateLimitResponse('practice-respond', userId, 60, 15 * 60_000);
+    if (limited) return limited;
     const result = await submitResponse({
       userId,
       sessionId: body.sessionId,

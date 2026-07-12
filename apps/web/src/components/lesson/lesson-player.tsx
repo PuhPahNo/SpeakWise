@@ -26,6 +26,32 @@ interface ScriptLine {
   text: string;
 }
 
+interface TaskOption {
+  value: string;
+  label: string;
+}
+
+const PASSIVE_TASK_TYPES = new Set(['briefing', 'explanation', 'recap', 'media_clip']);
+
+function normalizeOptions(value: unknown): TaskOption[] | null {
+  if (!Array.isArray(value)) return null;
+  const options = value.flatMap((item): TaskOption[] => {
+    if (typeof item === 'string') return [{ value: item, label: item }];
+    if (
+      typeof item === 'object' &&
+      item !== null &&
+      'value' in item &&
+      'label' in item &&
+      typeof item.value === 'string' &&
+      typeof item.label === 'string'
+    ) {
+      return [{ value: item.value, label: item.label }];
+    }
+    return [];
+  });
+  return options.length > 0 ? options : null;
+}
+
 // Two ElevenLabs premade voices that handle Italian phonetics well.
 // A = Bill (mature, balanced — the default Wise voice); B = Alice (clear,
 // engaging — a clear gender/timbre contrast so the learner can tell the
@@ -100,6 +126,7 @@ export function LessonPlayer({
     issues: Array<{ sound: string; note: string }>;
   } | null>(null);
   const [pending, setPending] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
   const [showText, setShowText] = useState(false);
   const [xpEarned, setXpEarned] = useState<number | null>(null);
   const [streakDays, setStreakDays] = useState<number | null>(null);
@@ -147,12 +174,13 @@ export function LessonPlayer({
     onUserSpeech: async (text) => {
       setAnswer(text);
       // For voice tasks, auto-submit
-      await submit(text);
+      await submit(text, 'voice');
     },
   });
 
   const currentTask = tasks[taskIndex];
-  const opts = (currentTask?.options ?? null) as Array<{ value: string; label: string }> | null;
+  const opts = normalizeOptions(currentTask?.options);
+  const isPassiveTask = currentTask ? PASSIVE_TASK_TYPES.has(currentTask.taskType) : false;
 
   // ── Session start + briefing narration ───────────────────────────────
   // Called from the "Begin lesson" button click — a real user gesture.
@@ -162,6 +190,7 @@ export function LessonPlayer({
   async function startSession() {
     if (briefedRef.current) return;
     briefedRef.current = true;
+    setRequestError(null);
     setPending(true);
     try {
       // Prime audio FIRST, synchronously inside the click handler.
@@ -169,15 +198,27 @@ export function LessonPlayer({
       const res = await fetch(`/api/lessons/${lesson.id}/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'voice' }),
+        body: JSON.stringify({ mode }),
       });
       const data = await res.json();
+      if (!res.ok || !data.session?.id) {
+        throw new Error(data.message ?? 'Could not start this lesson.');
+      }
       setSessionId(data.session.id);
       setPhase('briefing');
       if (briefing.trim()) {
         await tutor.speak(briefing, { autoListenAfter: false });
       }
-      await beginTask(0);
+      const currentTaskId = (data.currentTask as { id?: string } | null)?.id;
+      if (!currentTaskId) {
+        await finish(data.session.id);
+        return;
+      }
+      const resumeIndex = tasks.findIndex((task) => task.id === currentTaskId);
+      await beginTask(resumeIndex >= 0 ? resumeIndex : 0);
+    } catch (error) {
+      briefedRef.current = false;
+      setRequestError(error instanceof Error ? error.message : 'Could not start this lesson.');
     } finally {
       setPending(false);
     }
@@ -253,10 +294,14 @@ export function LessonPlayer({
     }
   }
 
-  async function submit(answerText?: string) {
+  async function submit(
+    answerText?: string,
+    inputType: 'voice' | 'text' | 'multiple_choice' = 'text',
+  ) {
     const a = (answerText ?? answer).trim();
     if (!a || !sessionId || !currentTask) return;
     setPending(true);
+    setRequestError(null);
     try {
       const res = await fetch('/api/practice/respond', {
         method: 'POST',
@@ -264,11 +309,14 @@ export function LessonPlayer({
         body: JSON.stringify({
           sessionId,
           lessonTaskId: currentTask.id,
-          inputType: currentTask.taskType === 'multiple_choice' ? 'multiple_choice' : 'voice',
+          inputType,
           answer: a,
         }),
       });
       const data = await res.json();
+      if (!res.ok || !data.userResponse || !data.correction) {
+        throw new Error(data.message ?? 'Wise could not check that answer. Please retry.');
+      }
       const c = data.correction as Record<string, unknown>;
       setLastResponseId((data.userResponse as { id?: string })?.id ?? null);
       setLastAnswerSent(a);
@@ -298,6 +346,8 @@ export function LessonPlayer({
       // actually coaches the learner's mouth, not just their grammar.
       const spoken = pron?.tip ? `${base} Pronuncia: ${pron.tip}` : base;
       await tutor.speak(spoken, { autoListenAfter: false });
+    } catch (error) {
+      setRequestError(error instanceof Error ? error.message : 'Could not submit that answer.');
     } finally {
       setPending(false);
     }
@@ -311,22 +361,26 @@ export function LessonPlayer({
     }
   }
 
-  async function finish() {
-    if (!sessionId) return;
+  async function finish(sessionIdOverride?: string) {
+    const activeSessionId = sessionIdOverride ?? sessionId;
+    if (!activeSessionId) return;
     setPending(true);
+    setRequestError(null);
     try {
       const res = await fetch(`/api/lessons/${lesson.id}/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId }),
+        body: JSON.stringify({ sessionId: activeSessionId }),
       });
       const data = (await res.json()) as {
+        message?: string;
         sessionSummary?: { tasksCompleted: number; mistakesDetected: number };
         xpEarned?: number;
         streakDays?: number;
         newMemory?: Array<{ type: string; content: string }>;
       };
-      setXpEarned(data.xpEarned ?? 50);
+      if (!res.ok) throw new Error(data.message ?? 'Could not finish this lesson.');
+      setXpEarned(data.xpEarned ?? 0);
       setStreakDays(data.streakDays ?? null);
       setNewMemory(data.newMemory ?? []);
       setPhase('complete');
@@ -342,6 +396,8 @@ export function LessonPlayer({
           ? ' I learned something new about you, too — saving it.'
           : '';
       await tutor.speak(headline + memoryLine, { autoListenAfter: false });
+    } catch (error) {
+      setRequestError(error instanceof Error ? error.message : 'Could not finish this lesson.');
     } finally {
       setPending(false);
     }
@@ -392,7 +448,16 @@ export function LessonPlayer({
           ariaLabel="Begin lesson"
         />
         <ModeToggle mode={mode} setMode={setMode} />
+        {requestError && (
+          <p
+            role="alert"
+            className="max-w-md rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100"
+          >
+            {requestError}
+          </p>
+        )}
         <button
+          type="button"
           onClick={startSession}
           disabled={pending}
           className="rounded-full bg-wise-500 hover:bg-wise-600 text-ink-900 font-medium px-7 py-3 disabled:opacity-50"
@@ -432,8 +497,8 @@ export function LessonPlayer({
               Wise just learned
             </div>
             <ul className="space-y-1.5">
-              {newMemory.map((m, i) => (
-                <li key={i} className="text-sm text-ink-100 leading-snug">
+              {newMemory.map((m) => (
+                <li key={`${m.type}:${m.content}`} className="text-sm text-ink-100 leading-snug">
                   · {m.content}
                 </li>
               ))}
@@ -442,6 +507,7 @@ export function LessonPlayer({
         )}
 
         <button
+          type="button"
           onClick={() => router.push('/command-center')}
           className="rounded-full bg-wise-500 hover:bg-wise-600 text-ink-900 font-medium px-6 py-3"
         >
@@ -480,6 +546,15 @@ export function LessonPlayer({
 
       <ModeToggle mode={mode} setMode={setMode} />
 
+      {requestError && (
+        <p
+          role="alert"
+          className="w-full max-w-xl rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100"
+        >
+          {requestError}
+        </p>
+      )}
+
       {/* Orb shrinks in text mode so the prompt + answer area is the
           focus. It's still tappable for those who want to speak. */}
       <VoiceOrb
@@ -504,12 +579,14 @@ export function LessonPlayer({
               {currentTask.prompt.split(/(_+)/g).map((seg, i) =>
                 /^_+$/.test(seg) ? (
                   <span
+                    // biome-ignore lint/suspicious/noArrayIndexKey: repeated text segments have no intrinsic id
                     key={i}
                     className="inline-block min-w-[2em] mx-1 px-2 border-b-2 border-wise-400 text-wise-400"
                   >
                     {' '.repeat(Math.max(seg.length, 4))}
                   </span>
                 ) : (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: repeated text segments have no intrinsic id
                   <span key={i}>{seg}</span>
                 ),
               )}
@@ -562,7 +639,7 @@ export function LessonPlayer({
         </motion.div>
       </AnimatePresence>
 
-      {phase === 'task' && opts && (
+      {phase === 'task' && opts && !isPassiveTask && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -577,7 +654,7 @@ export function LessonPlayer({
               transition={{ duration: 0.25, delay: 0.15 + i * 0.05 }}
               onClick={() => {
                 setAnswer(o.value);
-                void submit(o.value);
+                void submit(o.value, 'multiple_choice');
               }}
               disabled={pending || tutor.state === 'speaking'}
               className="block w-full text-left rounded-xl px-4 py-3 surface text-ink-50 hover:border-wise-500/40 active:bg-white/5 transition disabled:opacity-50"
@@ -590,10 +667,11 @@ export function LessonPlayer({
 
       {/* Voice answer ergonomics + collapsed text fallback. In text
           mode the input shows by default — typing IS the primary path. */}
-      {phase === 'task' && !opts && (
+      {phase === 'task' && !opts && !isPassiveTask && (
         <div className="flex flex-col items-center gap-3 w-full max-w-xl">
           {mode === 'voice' && !showText ? (
             <button
+              type="button"
               onClick={() => setShowText(true)}
               className="text-sm text-ink-200 hover:text-ink-50 underline-offset-4 hover:underline"
             >
@@ -603,7 +681,7 @@ export function LessonPlayer({
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                void submit();
+                void submit(undefined, 'text');
               }}
               className="w-full flex gap-2"
             >
@@ -625,6 +703,17 @@ export function LessonPlayer({
             </form>
           )}
         </div>
+      )}
+
+      {phase === 'task' && isPassiveTask && (
+        <button
+          type="button"
+          onClick={next}
+          disabled={pending || tutor.state === 'speaking'}
+          className="rounded-full bg-wise-500 px-5 py-3 font-medium text-ink-900 hover:bg-wise-600 disabled:opacity-50"
+        >
+          {taskIndex + 1 < tasks.length ? 'Continue →' : 'Finish lesson'}
+        </button>
       )}
 
       <AnimatePresence>
@@ -663,8 +752,8 @@ export function LessonPlayer({
                 <p className="mt-1 text-sm text-ink-100">{pronunciation.tip}</p>
                 {pronunciation.issues.length > 0 && (
                   <ul className="mt-1.5 space-y-0.5">
-                    {pronunciation.issues.map((iss, i) => (
-                      <li key={i} className="text-xs text-ink-300">
+                    {pronunciation.issues.map((iss) => (
+                      <li key={`${iss.sound}:${iss.note}`} className="text-xs text-ink-300">
                         · <span className="text-ink-100">{iss.sound}</span> — {iss.note}
                       </li>
                     ))}
@@ -673,6 +762,7 @@ export function LessonPlayer({
               </div>
             )}
             <button
+              type="button"
               onClick={next}
               className="mt-4 w-full sm:w-auto rounded-full bg-wise-500 hover:bg-wise-600 text-ink-900 font-medium px-5 py-3"
             >

@@ -391,3 +391,12 @@ input:-webkit-autofill:focus {
 /* Native checkbox/radio/range opt out of the dark text-input box styling. */
 input[type="range"]{padding:0;border:none;background:transparent;height:auto;accent-color:var(--accent)}
 input[type="checkbox"],input[type="radio"]{width:auto;height:auto;min-height:0;padding:0;border-radius:4px;accent-color:var(--accent)}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

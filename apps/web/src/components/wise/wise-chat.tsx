@@ -4,7 +4,22 @@ import { Loader2, Mic, Send, Volume2 } from 'lucide-react';
 import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
 
-type Msg = { role: 'user' | 'wise'; content: string };
+type Msg = { id: string; role: 'user' | 'wise'; content: string };
+
+let messageSequence = 0;
+function nextMessageId(role: Msg['role']) {
+  messageSequence += 1;
+  return `${role}-${Date.now()}-${messageSequence}`;
+}
+
+function keyed(values: string[]) {
+  const occurrences = new Map<string, number>();
+  return values.map((value) => {
+    const occurrence = (occurrences.get(value) ?? 0) + 1;
+    occurrences.set(value, occurrence);
+    return { value, key: `${value}:${occurrence}` };
+  });
+}
 
 // ── markdown-lite (no dep) — **bold**, *italic*/_italic_, `code`, -/1. lists ──
 function renderInline(text: string, key: string): React.ReactNode[] {
@@ -36,37 +51,41 @@ function renderInline(text: string, key: string): React.ReactNode[] {
 }
 
 function Markdown({ content }: { content: string }) {
-  const blocks = content.split(/\n{2,}/);
+  const blocks = keyed(content.split(/\n{2,}/));
   return (
     <>
-      {blocks.map((block, bi) => {
-        const lines = block.split('\n');
-        const isUl = lines.length > 0 && lines.every((l) => /^\s*[-*]\s+/.test(l));
-        const isOl = lines.length > 0 && lines.every((l) => /^\s*\d+\.\s+/.test(l));
+      {blocks.map(({ value: block, key: blockKey }) => {
+        const lines = keyed(block.split('\n'));
+        const isUl = lines.length > 0 && lines.every(({ value }) => /^\s*[-*]\s+/.test(value));
+        const isOl = lines.length > 0 && lines.every(({ value }) => /^\s*\d+\.\s+/.test(value));
         if (isUl) {
           return (
-            <ul key={bi} className="my-1 list-disc space-y-0.5 pl-5">
-              {lines.map((l, li) => (
-                <li key={li}>{renderInline(l.replace(/^\s*[-*]\s+/, ''), `${bi}-${li}`)}</li>
+            <ul key={blockKey} className="my-1 list-disc space-y-0.5 pl-5">
+              {lines.map(({ value, key }) => (
+                <li key={key}>
+                  {renderInline(value.replace(/^\s*[-*]\s+/, ''), `${blockKey}-${key}`)}
+                </li>
               ))}
             </ul>
           );
         }
         if (isOl) {
           return (
-            <ol key={bi} className="my-1 list-decimal space-y-0.5 pl-5">
-              {lines.map((l, li) => (
-                <li key={li}>{renderInline(l.replace(/^\s*\d+\.\s+/, ''), `${bi}-${li}`)}</li>
+            <ol key={blockKey} className="my-1 list-decimal space-y-0.5 pl-5">
+              {lines.map(({ value, key }) => (
+                <li key={key}>
+                  {renderInline(value.replace(/^\s*\d+\.\s+/, ''), `${blockKey}-${key}`)}
+                </li>
               ))}
             </ol>
           );
         }
         return (
-          <p key={bi} className="my-1 leading-relaxed">
-            {lines.map((l, li) => (
-              <span key={li}>
-                {renderInline(l, `${bi}-${li}`)}
-                {li < lines.length - 1 ? <br /> : null}
+          <p key={blockKey} className="my-1 leading-relaxed">
+            {lines.map(({ value, key }, lineIndex) => (
+              <span key={key}>
+                {renderInline(value, `${blockKey}-${key}`)}
+                {lineIndex < lines.length - 1 ? <br /> : null}
               </span>
             ))}
           </p>
@@ -85,6 +104,7 @@ const SUGGESTIONS = [
 export function WiseChat({ firstName }: { firstName: string }) {
   const [messages, setMessages] = useState<Msg[]>([
     {
+      id: 'opener',
       role: 'wise',
       content: `Ciao ${firstName}! 👋 What's on your mind — want to practice, ask a question about Italian, or just chat a bit?`,
     },
@@ -109,7 +129,11 @@ export function WiseChat({ firstName }: { firstName: string }) {
       })),
       { role: 'user' as const, content },
     ];
-    setMessages((m) => [...m, { role: 'user', content }, { role: 'wise', content: '' }]);
+    setMessages((m) => [
+      ...m,
+      { id: nextMessageId('user'), role: 'user', content },
+      { id: nextMessageId('wise'), role: 'wise', content: '' },
+    ]);
     setInput('');
     setStreaming(true);
     try {
@@ -128,24 +152,30 @@ export function WiseChat({ firstName }: { firstName: string }) {
         acc += decoder.decode(value, { stream: true });
         setMessages((m) => {
           const c = [...m];
-          c[c.length - 1] = { role: 'wise', content: acc };
+          const last = c[c.length - 1];
+          if (last) c[c.length - 1] = { ...last, content: acc };
           return c;
         });
       }
       if (!acc.trim()) {
         setMessages((m) => {
           const c = [...m];
-          c[c.length - 1] = { role: 'wise', content: 'Sorry — I didn’t catch that. Try again?' };
+          const last = c[c.length - 1];
+          if (last)
+            c[c.length - 1] = { ...last, content: 'Sorry — I didn’t catch that. Try again?' };
           return c;
         });
       }
     } catch {
       setMessages((m) => {
         const c = [...m];
-        c[c.length - 1] = {
-          role: 'wise',
-          content: 'Sorry — something went wrong. Try again in a moment.',
-        };
+        const last = c[c.length - 1];
+        if (last) {
+          c[c.length - 1] = {
+            ...last,
+            content: 'Sorry — something went wrong. Try again in a moment.',
+          };
+        }
         return c;
       });
     } finally {
@@ -180,14 +210,14 @@ export function WiseChat({ firstName }: { firstName: string }) {
             const isLast = i === messages.length - 1;
             if (m.role === 'user') {
               return (
-                <div key={i} className="msg msg-user">
+                <div key={m.id} className="msg msg-user">
                   <div className="bubble bubble-user">{m.content}</div>
                 </div>
               );
             }
             const showTyping = !m.content && streaming && isLast;
             return (
-              <div key={i} className="msg msg-wise">
+              <div key={m.id} className="msg msg-wise">
                 <div className="wise-badge" aria-hidden>
                   <span className="wise-dot" />
                 </div>

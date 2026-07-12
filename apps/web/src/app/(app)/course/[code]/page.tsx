@@ -125,6 +125,7 @@ export default async function ChapterPage({ params }: { params: Promise<{ code: 
                     </span>
                     <StartLessonButton
                       lessonType={t.lessonType}
+                      lessonTemplateSlug={t.slug}
                       targetSkillIds={ids.length > 0 ? ids : unitSkillIds.slice(0, 6)}
                       interestTheme={unit.theme}
                       durationMinutes={t.defaultDurationMinutes}

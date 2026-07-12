@@ -1,13 +1,16 @@
 import type { BrowserContext, ConsoleMessage, Page } from '@playwright/test';
 
-const TEST_USERNAME = process.env.TEST_USERNAME ?? 'anthony';
-const TEST_PASSWORD = process.env.TEST_PASSWORD ?? 'admin123';
+const TEST_USERNAME = process.env.TEST_USERNAME;
+const TEST_PASSWORD = process.env.TEST_PASSWORD;
 
 /**
  * Sign in by hitting the API and dropping the cookie into the context, so
  * tests don't need to drive the form every time.
  */
 export async function authenticate(context: BrowserContext, baseURL: string): Promise<void> {
+  if (!TEST_USERNAME || !TEST_PASSWORD) {
+    throw new Error('TEST_USERNAME and TEST_PASSWORD are required for E2E tests.');
+  }
   const res = await context.request.post(`${baseURL}/api/auth/signin`, {
     data: { username: TEST_USERNAME, password: TEST_PASSWORD },
   });

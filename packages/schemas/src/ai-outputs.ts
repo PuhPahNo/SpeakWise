@@ -153,7 +153,7 @@ export const CorrectionOutputSchema = z.object({
 
 export const MemoryCandidateSchema = z.object({
   type: MemoryTypeEnum,
-  content: z.string().min(3),
+  content: z.string().min(3).max(1000),
   visibility: MemoryVisibilityEnum,
   confidence: z.number().min(0).max(1),
   structuredData: z.record(z.unknown()).optional(),
@@ -164,14 +164,14 @@ export const MemoryExtractionOutputSchema = z.object({
   profileUpdates: z.record(z.unknown()),
   skillSignals: z.array(
     z.object({
-      skillSlug: z.string(),
+      skillSlug: z.string().min(1).max(160),
       outcome: z.enum(['correct', 'incorrect']),
       weight: z.number().min(0).max(1),
     }),
   ),
   vocabularySignals: z.array(
     z.object({
-      targetText: z.string(),
+      targetText: z.string().min(1).max(300),
       outcome: z.enum(['correct', 'incorrect']),
     }),
   ),

@@ -1,4 +1,5 @@
 import { withAuth, withAuthAndJson } from '@/lib/api/route-handler';
+import { SAFE_USER_SELECT } from '@/lib/auth/current-user';
 import { ensureProfile } from '@/server/services/profile';
 import { prisma } from '@speakwise/db';
 import { PatchMeRequestSchema } from '@speakwise/schemas';
@@ -20,6 +21,7 @@ export async function PATCH(req: Request) {
         nativeLanguage: body.nativeLanguage ?? undefined,
         targetLanguage: body.targetLanguage ?? undefined,
       },
+      select: SAFE_USER_SELECT,
     });
     return { user: updated };
   });

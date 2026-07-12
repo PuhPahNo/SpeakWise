@@ -10,7 +10,14 @@ export const XP_REWARDS = {
 };
 
 export async function awardXp(userId: string, amount: number, reason: string, sourceId?: string) {
-  await prisma.xpEntry.create({ data: { userId, amount, reason, sourceId } });
+  if (!sourceId) {
+    return prisma.xpEntry.create({ data: { userId, amount, reason } });
+  }
+  return prisma.xpEntry.upsert({
+    where: { userId_reason_sourceId: { userId, reason, sourceId } },
+    update: {},
+    create: { userId, amount, reason, sourceId },
+  });
 }
 
 export async function getXpTotal(userId: string) {
@@ -28,6 +35,28 @@ export interface GamificationSummary {
   lastActiveDate: string | null;
 }
 
+function calendarDateInTimezone(timezone: string, now = new Date()) {
+  let parts: Intl.DateTimeFormatPart[];
+  try {
+    parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+    }).formatToParts(now);
+  } catch {
+    parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'UTC',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+    }).formatToParts(now);
+  }
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value ?? 0);
+  return new Date(Date.UTC(value('year'), value('month') - 1, value('day')));
+}
+
 export async function getGamificationSummary(userId: string): Promise<GamificationSummary> {
   const [xp, streak] = await Promise.all([
     getXpTotal(userId),
@@ -41,18 +70,26 @@ export async function getGamificationSummary(userId: string): Promise<Gamificati
   };
 }
 
-export async function getXpEarnedSince(userId: string, since: Date): Promise<number> {
+/** XP attributable to one lesson attempt, excluding unrelated activity. */
+export async function getLessonSessionXp(userId: string, sessionId: string): Promise<number> {
+  const responses = await prisma.userResponse.findMany({
+    where: { sessionId, session: { userId } },
+    select: { lessonTaskId: true },
+  });
+  const sourceIds = [sessionId, ...responses.flatMap((response) => response.lessonTaskId ?? [])];
   const result = await prisma.xpEntry.aggregate({
-    where: { userId, createdAt: { gte: since } },
+    where: { userId, sourceId: { in: sourceIds } },
     _sum: { amount: true },
   });
   return result._sum.amount ?? 0;
 }
 
 export async function bumpStreak(userId: string) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const existing = await prisma.userStreak.findUnique({ where: { userId } });
+  const [existing, user] = await Promise.all([
+    prisma.userStreak.findUnique({ where: { userId } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { timezone: true } }),
+  ]);
+  const today = calendarDateInTimezone(user?.timezone ?? 'UTC');
 
   if (!existing) {
     return prisma.userStreak.create({
@@ -72,7 +109,7 @@ export async function bumpStreak(userId: string) {
   const newLongest = Math.max(existing.longestDays, newCurrent);
 
   if (newCurrent > 0 && newCurrent % 7 === 0) {
-    await awardXp(userId, XP_REWARDS.streak_milestone, `streak_${newCurrent}`);
+    await awardXp(userId, XP_REWARDS.streak_milestone, `streak_${newCurrent}`, userId);
   }
 
   return prisma.userStreak.update({
@@ -81,11 +118,13 @@ export async function bumpStreak(userId: string) {
   });
 }
 
-export async function offerComebackIfNeeded(userId: string) {
-  const streak = await prisma.userStreak.findUnique({ where: { userId } });
+export async function offerComebackIfNeeded(userId: string, emitEvent = false) {
+  const [streak, user] = await Promise.all([
+    prisma.userStreak.findUnique({ where: { userId } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { timezone: true } }),
+  ]);
   if (!streak?.lastActiveDate) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = calendarDateInTimezone(user?.timezone ?? 'UTC');
   const lastDay = new Date(streak.lastActiveDate);
   const daysMissed = Math.floor((today.getTime() - lastDay.getTime()) / (24 * 60 * 60 * 1000));
   if (daysMissed < 1) return null;
@@ -95,6 +134,12 @@ export async function offerComebackIfNeeded(userId: string) {
     recommendedDurationMinutes: daysMissed === 1 ? 4 : 6,
     reason: 'missed_planned_session',
   };
-  await emitUserEvent(userId, 'ComebackLessonOffered', offer);
+  if (emitEvent) {
+    const alreadyEmitted = await prisma.userEvent.findFirst({
+      where: { userId, eventType: 'ComebackLessonOffered', createdAt: { gte: today } },
+      select: { id: true },
+    });
+    if (!alreadyEmitted) await emitUserEvent(userId, 'ComebackLessonOffered', offer);
+  }
   return offer;
 }

@@ -124,6 +124,16 @@ export interface ChatStreamOptions {
   model?: string;
   temperature?: number;
   maxOutputTokens?: number;
+  onUsage?: (usage: ChatStreamUsage) => void | Promise<void>;
+}
+
+export interface ChatStreamUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  latencyMs: number;
+  model: string;
+  promptVersion: number;
 }
 
 /**
@@ -134,6 +144,7 @@ export interface ChatStreamOptions {
  * chatStructured.
  */
 export async function* streamChat(opts: ChatStreamOptions): AsyncGenerator<string> {
+  const startedAt = Date.now();
   const tpl = await loadPrompt(opts.promptKey, opts.promptVersion);
   const system = renderPrompt(tpl.body, opts.vars);
   const openai = getOpenAI();
@@ -142,12 +153,29 @@ export async function* streamChat(opts: ChatStreamOptions): AsyncGenerator<strin
     temperature: opts.temperature ?? 0.6,
     max_tokens: opts.maxOutputTokens ?? 800,
     stream: true,
+    stream_options: { include_usage: true },
     messages: [{ role: 'system', content: system }, ...opts.messages],
   });
+  let promptTokens = 0;
+  let completionTokens = 0;
+  let totalTokens = 0;
   for await (const chunk of stream) {
+    if (chunk.usage) {
+      promptTokens = chunk.usage.prompt_tokens;
+      completionTokens = chunk.usage.completion_tokens;
+      totalTokens = chunk.usage.total_tokens;
+    }
     const delta = chunk.choices[0]?.delta?.content;
     if (delta) yield delta;
   }
+  await opts.onUsage?.({
+    promptTokens,
+    completionTokens,
+    totalTokens,
+    latencyMs: Date.now() - startedAt,
+    model: opts.model ?? Models.fast,
+    promptVersion: tpl.version,
+  });
 }
 
 export interface TranscribeInput {

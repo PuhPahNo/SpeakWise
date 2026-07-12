@@ -1,8 +1,10 @@
 import { Models, chatStructured } from '@speakwise/ai';
-import { prisma } from '@speakwise/db';
+import { type Prisma, prisma } from '@speakwise/db';
 import { emitUserEvent } from '@speakwise/events';
 import { CorrectionOutputSchema } from '@speakwise/schemas';
+import type { CorrectionOutputParsed } from '@speakwise/schemas';
 import { recordSkillEvidence } from '../progress';
+import { reviewVocabulary } from '../vocabulary';
 import { firstAcceptableDisplay, gradeObjective } from './objective-grader';
 import { assessPronunciation } from './pronunciation';
 
@@ -22,10 +24,28 @@ export async function evaluateUserResponse({
     where: { id: userResponseId, session: { userId } },
     include: {
       lessonTask: true,
+      corrections: { orderBy: { createdAt: 'asc' }, take: 1 },
       session: { include: { lesson: true, user: { include: { profile: true } } } },
     },
   });
   if (!ur) throw new Error('UserResponse not found');
+
+  const storedCorrection = ur.corrections[0];
+  if (storedCorrection && ur.isCorrect !== null) {
+    const ai: CorrectionOutputParsed = {
+      isCorrect: ur.isCorrect,
+      score: Number(ur.score ?? 0),
+      encouragement: storedCorrection.encouragement ?? '',
+      correctedAnswer: storedCorrection.correctedText,
+      explanation: storedCorrection.explanation,
+      mistakeType: ur.isCorrect ? null : storedCorrection.correctionType,
+      severity: ur.isCorrect ? null : storedCorrection.severity,
+      skillTags: storedCorrection.skillIds,
+      retryPrompt: storedCorrection.retryPrompt,
+      shouldUpdateMemory: false,
+    };
+    return { correction: storedCorrection, ai, pronunciation: null };
+  }
 
   const profile = ur.session.user.profile;
   const level = profile?.currentLevel ?? 'beginner';
@@ -112,29 +132,53 @@ export async function evaluateUserResponse({
   // severity (no mistake to classify). The Correction row still anchors
   // the explanation + encouragement we want to surface, so default the
   // non-nullable Prisma fields to harmless values for correct answers.
-  const correction = await prisma.correction.create({
-    data: {
-      userResponseId: ur.id,
-      correctionType: ai.mistakeType ?? 'other',
-      severity: ai.severity ?? 'minor',
-      originalText: ur.userAnswer,
-      correctedText: ai.correctedAnswer,
-      explanation: ai.explanation,
-      encouragement: ai.encouragement,
-      retryPrompt: ai.retryPrompt ?? undefined,
-      skillIds: ur.lessonTask?.targetSkillIds ?? [],
-    },
-  });
-
-  await prisma.userResponse.update({
-    where: { id: ur.id },
-    data: {
-      isCorrect: ai.isCorrect,
-      score: ai.score,
-      feedback: ai.explanation,
-      correctedAnswer: ai.correctedAnswer,
-    },
-  });
+  let correction: Prisma.CorrectionGetPayload<Record<string, never>>;
+  try {
+    correction = await prisma.$transaction(async (tx) => {
+      const created = await tx.correction.create({
+        data: {
+          userResponseId: ur.id,
+          correctionType: ai.mistakeType ?? 'other',
+          severity: ai.severity ?? 'minor',
+          originalText: ur.userAnswer,
+          correctedText: ai.correctedAnswer,
+          explanation: ai.explanation,
+          encouragement: ai.encouragement,
+          retryPrompt: ai.retryPrompt ?? undefined,
+          skillIds: ur.lessonTask?.targetSkillIds ?? [],
+        },
+      });
+      await tx.userResponse.update({
+        where: { id: ur.id },
+        data: {
+          isCorrect: ai.isCorrect,
+          score: ai.score,
+          feedback: ai.explanation,
+          correctedAnswer: ai.correctedAnswer,
+        },
+      });
+      return created;
+    });
+  } catch (error) {
+    const concurrent = await prisma.correction.findUnique({
+      where: { userResponseId: ur.id },
+      include: { userResponse: true },
+    });
+    if (!concurrent || concurrent.userResponse.isCorrect === null) throw error;
+    const concurrentAi: CorrectionOutputParsed = {
+      isCorrect: concurrent.userResponse.isCorrect,
+      score: Number(concurrent.userResponse.score ?? 0),
+      encouragement: concurrent.encouragement ?? '',
+      correctedAnswer: concurrent.correctedText,
+      explanation: concurrent.explanation,
+      mistakeType: concurrent.userResponse.isCorrect ? null : concurrent.correctionType,
+      severity: concurrent.userResponse.isCorrect ? null : concurrent.severity,
+      skillTags: concurrent.skillIds,
+      retryPrompt: concurrent.retryPrompt,
+      shouldUpdateMemory: false,
+    };
+    return { correction: concurrent, ai: concurrentAi, pronunciation: null };
+  }
 
   // Update progress for each tagged skill. The dimension we move
   // (production vs comprehension) depends on the task type:
@@ -158,7 +202,16 @@ export async function evaluateUserResponse({
         ? 'comprehension'
         : 'both';
   for (const skillId of ur.lessonTask?.targetSkillIds ?? []) {
-    await recordSkillEvidence({ userId, skillId, correct: ai.isCorrect, dimension });
+    await recordSkillEvidence({
+      userId,
+      skillId,
+      correct: ai.isCorrect,
+      dimension,
+      userResponseId: ur.id,
+    });
+  }
+  for (const vocabularyItemId of ur.vocabularyItemIds) {
+    await reviewVocabulary(userId, vocabularyItemId, ai.isCorrect ? 'correct' : 'incorrect');
   }
 
   await emitUserEvent(userId, 'UserCorrected', {

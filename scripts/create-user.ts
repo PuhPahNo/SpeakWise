@@ -20,6 +20,7 @@
 
 import { randomBytes } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
+import { AdminCreateUserRequestSchema } from '@speakwise/schemas';
 import bcrypt from 'bcryptjs';
 
 interface Args {
@@ -71,7 +72,7 @@ function generateInviteCode(): string {
   const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   const buf = randomBytes(8);
   let code = '';
-  for (let i = 0; i < 8; i++) code += alphabet[buf[i]! % alphabet.length];
+  for (let i = 0; i < 8; i++) code += alphabet[(buf[i] ?? 0) % alphabet.length];
   return code;
 }
 
@@ -85,28 +86,36 @@ function generatePassword(length = 16): string {
 async function main() {
   const args = parseArgs();
   const password = args.password ?? generatePassword();
+  const role: 'admin' | 'tutor' | 'learner' = args.admin
+    ? 'admin'
+    : args.tutor
+      ? 'tutor'
+      : 'learner';
+  const input = AdminCreateUserRequestSchema.parse({
+    username: args.username,
+    password,
+    name: args.name ?? args.username,
+    email: args.email?.trim().toLowerCase(),
+    role,
+  });
   const passwordHash = await bcrypt.hash(password, 12);
 
   const prisma = new PrismaClient();
   try {
-    const existing = await prisma.user.findUnique({ where: { username: args.username } });
+    const existing = await prisma.user.findFirst({
+      where: { username: { equals: input.username, mode: 'insensitive' } },
+    });
     if (existing) {
-      console.error(`✗ user "${args.username}" already exists (id: ${existing.id})`);
+      console.error(`✗ user "${input.username}" already exists (id: ${existing.id})`);
       process.exit(1);
     }
 
-    const role: 'admin' | 'tutor' | 'learner' = args.admin
-      ? 'admin'
-      : args.tutor
-        ? 'tutor'
-        : 'learner';
-
     const user = await prisma.user.create({
       data: {
-        username: args.username,
+        username: input.username,
         passwordHash,
-        name: args.name ?? args.username,
-        email: args.email ?? null,
+        name: input.name,
+        email: input.email || null,
         role,
         nativeLanguage: 'en',
         targetLanguage: 'it',

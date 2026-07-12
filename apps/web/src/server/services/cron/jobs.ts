@@ -14,7 +14,7 @@ export async function runNightly(): Promise<{ processed: number; offers: number 
   const users = await prisma.user.findMany({ where: { role: 'learner' }, select: { id: true } });
   let offers = 0;
   for (const u of users) {
-    const offer = await offerComebackIfNeeded(u.id);
+    const offer = await offerComebackIfNeeded(u.id, true);
     if (offer) offers++;
   }
   return { processed: users.length, offers };
@@ -29,9 +29,9 @@ export async function runMemoryExtract(): Promise<{
   errored: number;
   total: number;
 }> {
-  const since = new Date(Date.now() - 60 * 60 * 1000);
   const sessions = await prisma.session.findMany({
-    where: { status: 'completed', memoryUpdatesApplied: false, completedAt: { gte: since } },
+    where: { status: 'completed', memoryUpdatesApplied: false },
+    orderBy: { completedAt: 'asc' },
     take: 50,
   });
   let processed = 0;

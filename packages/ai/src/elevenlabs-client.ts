@@ -219,15 +219,15 @@ async function ttsRaw(input: TtsRawInput): Promise<ArrayBuffer> {
  * chunk's length to stay safe (no buffer overruns).
  */
 function crossfadeMonoPcm16(chunks: Buffer[], sampleRate: number, fadeMs: number): Buffer {
-  if (chunks.length === 0) return Buffer.alloc(0);
-  if (chunks.length === 1) return chunks[0]!;
+  const [first, ...rest] = chunks;
+  if (!first) return Buffer.alloc(0);
+  if (rest.length === 0) return first;
 
   const fadeSamples = Math.max(1, Math.floor((fadeMs / 1000) * sampleRate));
   // 16-bit mono → 2 bytes per sample
   const out: Buffer[] = [];
-  let prev = chunks[0]!;
-  for (let i = 1; i < chunks.length; i++) {
-    const curr = chunks[i]!;
+  let prev = first;
+  for (const curr of rest) {
     const safeFade = Math.min(
       fadeSamples,
       Math.floor(prev.length / 2),

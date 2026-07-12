@@ -8,7 +8,8 @@ export const dynamic = 'force-dynamic';
 // manual/forced runs and external triggers; it runs the same logic WITHOUT the
 // scheduler's dedup guard, so a human can re-run a window on demand.
 export async function POST(req: Request) {
-  if (req.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   }
   const result = await runNightly();

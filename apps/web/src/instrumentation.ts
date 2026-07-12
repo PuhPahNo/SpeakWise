@@ -12,6 +12,10 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return;
   if (process.env.NODE_ENV !== 'production') return;
+
+  const { validatePublicEnv, validateServerEnv } = await import('@speakwise/schemas');
+  validateServerEnv(process.env);
+  validatePublicEnv(process.env);
   if (process.env.DISABLE_CRON === '1') return;
 
   const { startCronScheduler } = await import('@/server/services/cron/scheduler');

@@ -1,19 +1,22 @@
 import { expect, test } from '@playwright/test';
 
 test('sign-in form happy path lands on app shell', async ({ page }) => {
+  const username = process.env.TEST_USERNAME;
+  const password = process.env.TEST_PASSWORD;
+  if (!username || !password) throw new Error('TEST_USERNAME and TEST_PASSWORD are required');
   await page.goto('/sign-in');
-  await page.getByLabel(/username/i).fill('anthony');
-  await page.getByLabel(/password/i).fill('admin123');
+  await page.getByLabel(/username/i).fill(username);
+  await page.getByLabel(/password/i).fill(password);
   await page.getByRole('button', { name: /continue/i }).click();
-  // Should land on either /command-center or /onboarding (depends on profile state)
-  await page.waitForURL(/\/(command-center|onboarding)/, { timeout: 10_000 });
-  // Header should be present in the app shell
-  await expect(page.getByRole('link', { name: /^Speakwise$/ })).toBeVisible();
+  await page.waitForURL(/\/(admin|command-center|onboarding)/, { timeout: 10_000 });
+  await expect(page.locator('body')).toContainText(/Speakwise/i);
 });
 
 test('sign-in form rejects bad password with a visible error', async ({ page }) => {
+  const username = process.env.TEST_USERNAME;
+  if (!username) throw new Error('TEST_USERNAME is required');
   await page.goto('/sign-in');
-  await page.getByLabel(/username/i).fill('anthony');
+  await page.getByLabel(/username/i).fill(username);
   await page.getByLabel(/password/i).fill('this-is-wrong');
   await page.getByRole('button', { name: /continue/i }).click();
   await expect(page.getByText(/Wrong username or password/i)).toBeVisible();

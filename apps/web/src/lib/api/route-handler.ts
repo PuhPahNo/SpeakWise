@@ -1,28 +1,12 @@
+import { ConflictError, ForbiddenError, NotFoundError } from '@/lib/api/errors';
 import { UnauthenticatedError, getOrCreateUser } from '@/lib/auth/current-user';
+import { logger } from '@/lib/observability/logger';
+import { userRateLimitResponse } from '@/lib/security/rate-limit';
 import { AIError, AISchemaValidationError } from '@speakwise/ai';
 import { NextResponse } from 'next/server';
 import type { ZodTypeAny, z } from 'zod';
 
-export class ForbiddenError extends Error {
-  constructor(message = 'Forbidden') {
-    super(message);
-    this.name = 'ForbiddenError';
-  }
-}
-
-export class NotFoundError extends Error {
-  constructor(message = 'Not found') {
-    super(message);
-    this.name = 'NotFoundError';
-  }
-}
-
-export class ConflictError extends Error {
-  constructor(message = 'Conflict') {
-    super(message);
-    this.name = 'ConflictError';
-  }
-}
+export { ConflictError, ForbiddenError, NotFoundError } from '@/lib/api/errors';
 
 export interface AuthedContext {
   userId: string;
@@ -39,12 +23,19 @@ export interface AdminContext extends AuthedContext {
   user: AuthedContext['user'] & { role: 'admin' };
 }
 
+function globalUserLimit(userId: string) {
+  return userRateLimitResponse('authenticated-api', userId, 600, 15 * 60_000);
+}
+
 export async function withAuth<T>(
-  handler: (ctx: AuthedContext) => Promise<T>,
+  handler: (ctx: AuthedContext) => Promise<T | Response>,
 ): Promise<NextResponse> {
   try {
     const user = await getOrCreateUser();
+    const limited = globalUserLimit(user.id);
+    if (limited) return limited;
     const result = await handler({ userId: user.id, user });
+    if (result instanceof Response) return result as NextResponse;
     return NextResponse.json(result);
   } catch (err) {
     return errorResponse(err);
@@ -54,10 +45,12 @@ export async function withAuth<T>(
 export async function withAuthAndJson<S extends ZodTypeAny, T>(
   schema: S,
   req: Request,
-  handler: (ctx: AuthedContext, body: z.infer<S>) => Promise<T>,
+  handler: (ctx: AuthedContext, body: z.infer<S>) => Promise<T | Response>,
 ): Promise<NextResponse> {
   try {
     const user = await getOrCreateUser();
+    const limited = globalUserLimit(user.id);
+    if (limited) return limited;
     const json = await req.json().catch(() => ({}));
     const parsed = schema.safeParse(json);
     if (!parsed.success) {
@@ -67,6 +60,7 @@ export async function withAuthAndJson<S extends ZodTypeAny, T>(
       );
     }
     const result = await handler({ userId: user.id, user }, parsed.data);
+    if (result instanceof Response) return result as NextResponse;
     return NextResponse.json(result);
   } catch (err) {
     return errorResponse(err);
@@ -78,15 +72,18 @@ export async function withAuthAndJson<S extends ZodTypeAny, T>(
  * adds a role gate. Used by every /api/classroom/* route.
  */
 export async function withTutorAuth<T>(
-  handler: (ctx: TutorContext) => Promise<T>,
+  handler: (ctx: TutorContext) => Promise<T | Response>,
 ): Promise<NextResponse> {
   try {
     const user = await getOrCreateUser();
+    const limited = globalUserLimit(user.id);
+    if (limited) return limited;
     if (user.role !== 'tutor') throw new ForbiddenError('Tutor access only');
     const result = await handler({
       userId: user.id,
       user: user as TutorContext['user'],
     });
+    if (result instanceof Response) return result as NextResponse;
     return NextResponse.json(result);
   } catch (err) {
     return errorResponse(err);
@@ -96,10 +93,12 @@ export async function withTutorAuth<T>(
 export async function withTutorAuthAndJson<S extends ZodTypeAny, T>(
   schema: S,
   req: Request,
-  handler: (ctx: TutorContext, body: z.infer<S>) => Promise<T>,
+  handler: (ctx: TutorContext, body: z.infer<S>) => Promise<T | Response>,
 ): Promise<NextResponse> {
   try {
     const user = await getOrCreateUser();
+    const limited = globalUserLimit(user.id);
+    if (limited) return limited;
     if (user.role !== 'tutor') throw new ForbiddenError('Tutor access only');
     const json = await req.json().catch(() => ({}));
     const parsed = schema.safeParse(json);
@@ -113,6 +112,7 @@ export async function withTutorAuthAndJson<S extends ZodTypeAny, T>(
       { userId: user.id, user: user as TutorContext['user'] },
       parsed.data,
     );
+    if (result instanceof Response) return result as NextResponse;
     return NextResponse.json(result);
   } catch (err) {
     return errorResponse(err);
@@ -124,12 +124,15 @@ export async function withTutorAuthAndJson<S extends ZodTypeAny, T>(
  * Used by every /api/admin/* route.
  */
 export async function withAdminAuth<T>(
-  handler: (ctx: AdminContext) => Promise<T>,
+  handler: (ctx: AdminContext) => Promise<T | Response>,
 ): Promise<NextResponse> {
   try {
     const user = await getOrCreateUser();
+    const limited = globalUserLimit(user.id);
+    if (limited) return limited;
     if (user.role !== 'admin') throw new ForbiddenError('Admin access only');
     const result = await handler({ userId: user.id, user: user as AdminContext['user'] });
+    if (result instanceof Response) return result as NextResponse;
     return NextResponse.json(result);
   } catch (err) {
     return errorResponse(err);
@@ -139,10 +142,12 @@ export async function withAdminAuth<T>(
 export async function withAdminAuthAndJson<S extends ZodTypeAny, T>(
   schema: S,
   req: Request,
-  handler: (ctx: AdminContext, body: z.infer<S>) => Promise<T>,
+  handler: (ctx: AdminContext, body: z.infer<S>) => Promise<T | Response>,
 ): Promise<NextResponse> {
   try {
     const user = await getOrCreateUser();
+    const limited = globalUserLimit(user.id);
+    if (limited) return limited;
     if (user.role !== 'admin') throw new ForbiddenError('Admin access only');
     const json = await req.json().catch(() => ({}));
     const parsed = schema.safeParse(json);
@@ -156,6 +161,7 @@ export async function withAdminAuthAndJson<S extends ZodTypeAny, T>(
       { userId: user.id, user: user as AdminContext['user'] },
       parsed.data,
     );
+    if (result instanceof Response) return result as NextResponse;
     return NextResponse.json(result);
   } catch (err) {
     return errorResponse(err);
@@ -176,27 +182,25 @@ function errorResponse(err: unknown) {
     return NextResponse.json({ error: 'conflict', message: err.message }, { status: 409 });
   }
   if (err instanceof AISchemaValidationError) {
-    // Log the full raw and full issues — truncating either makes it
-    // impossible to debug schema regressions in dev.
-    console.error('AI schema validation error');
-    console.error('  purpose:', err.purpose);
-    console.error('  issues:', JSON.stringify(err.issues, null, 2));
-    console.error('  raw (full):', err.raw);
+    logger.error('ai.schema_validation_failed', err, { purpose: err.purpose, issues: err.issues });
+    if (process.env.NODE_ENV === 'development') {
+      console.error('  raw:', err.raw.slice(0, 4000));
+    }
     return NextResponse.json(
-      { error: 'ai_output_invalid', message: err.message, purpose: err.purpose },
+      { error: 'ai_output_invalid', message: 'Wise returned an invalid response. Please retry.' },
       { status: 502 },
     );
   }
   if (err instanceof AIError) {
-    console.error('AI error', err);
+    logger.error('ai.call_failed', err, { purpose: err.purpose });
     return NextResponse.json(
-      { error: 'ai_failure', message: err.message, purpose: err.purpose },
+      { error: 'ai_failure', message: 'Wise is temporarily unavailable. Please retry.' },
       { status: 502 },
     );
   }
-  console.error('API error', err);
+  logger.error('api.unhandled_error', err);
   return NextResponse.json(
-    { error: 'internal', message: err instanceof Error ? err.message : 'unknown' },
+    { error: 'internal', message: 'An unexpected error occurred.' },
     { status: 500 },
   );
 }

@@ -16,6 +16,7 @@ interface RecordResultOpts {
    *  - 'both'          fallback when we can't tell — bumps both halves.
    */
   dimension?: 'production' | 'comprehension' | 'both';
+  userResponseId?: string;
 }
 
 const NEXT_REVIEW_DAYS_CORRECT = [1, 3, 7, 14, 30];
@@ -37,6 +38,7 @@ export async function recordSkillEvidence({
   correct,
   weight = 1,
   dimension = 'both',
+  userResponseId,
 }: RecordResultOpts) {
   const prev = await prisma.userSkillProgress.upsert({
     where: { userId_skillId: { userId, skillId } },
@@ -100,7 +102,7 @@ export async function recordSkillEvidence({
 
   await emitUserEvent(userId, 'SkillEvidenceObserved', {
     skillId,
-    userResponseId: '00000000-0000-0000-0000-000000000000',
+    userResponseId: userResponseId ?? '00000000-0000-0000-0000-000000000000',
     outcome: correct ? 'correct' : 'incorrect',
   });
 

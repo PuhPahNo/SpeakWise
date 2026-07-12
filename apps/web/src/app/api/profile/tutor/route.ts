@@ -26,10 +26,7 @@ export async function POST(req: Request) {
       return { connected: true, ...result };
     } catch (e) {
       if (e instanceof InviteCodeNotFoundError) {
-        return NextResponse.json(
-          { error: 'invite_code_not_found' },
-          { status: 404 },
-        ) as unknown as { connected: false };
+        return NextResponse.json({ error: 'invite_code_not_found' }, { status: 404 });
       }
       throw e;
     }

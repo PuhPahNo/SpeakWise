@@ -4,9 +4,21 @@ import { CEFRLevelEnum, WiseTurnOutputSchema } from './ai-outputs';
 export const InputTypeEnum = z.enum(['voice', 'text', 'multiple_choice', 'selection']);
 export const SessionModeEnum = z.enum(['voice', 'text', 'mixed']);
 
+export const TimezoneSchema = z
+  .string()
+  .max(100)
+  .refine((value) => {
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: value }).format();
+      return true;
+    } catch {
+      return false;
+    }
+  }, 'timezone must be a valid IANA timezone');
+
 export const PatchMeRequestSchema = z.object({
   name: z.string().min(1).max(120).optional(),
-  timezone: z.string().optional(),
+  timezone: TimezoneSchema.optional(),
   nativeLanguage: z.enum(['en', 'it']).optional(),
   targetLanguage: z.enum(['en', 'it']).optional(),
 });
@@ -169,6 +181,7 @@ export const GenerateLessonRequestSchema = z.object({
   targetSkillIds: z.array(z.string().uuid()).optional(),
   interestTheme: z.string().max(200).optional(),
   userRequest: z.string().max(2000).optional(),
+  lessonTemplateSlug: z.string().trim().min(1).max(160).optional(),
 });
 
 export const PracticeRespondRequestSchema = z.object({
@@ -205,6 +218,7 @@ export const VocabularyCreateSchema = z.object({
 
 export const VocabularyReviewResultSchema = z.object({
   result: z.enum(['correct', 'incorrect']),
+  reviewToken: z.string().uuid().optional(),
 });
 
 export const ImportMediaRequestSchema = z.object({
@@ -249,7 +263,7 @@ export const AdminCreateUserRequestSchema = z.object({
   role: UserRoleEnum.default('learner'),
   /** Omit to auto-generate a strong temporary password (returned once). */
   password: z.string().min(8).max(200).optional(),
-  timezone: z.string().max(80).optional(),
+  timezone: TimezoneSchema.optional(),
   nativeLanguage: z.enum(['en', 'it']).optional(),
   targetLanguage: z.enum(['en', 'it']).optional(),
 });
@@ -259,7 +273,7 @@ export const AdminUpdateUserRequestSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   email: optionalEmail.nullable().optional(),
   role: UserRoleEnum.optional(),
-  timezone: z.string().max(80).nullable().optional(),
+  timezone: TimezoneSchema.nullable().optional(),
   nativeLanguage: z.enum(['en', 'it']).optional(),
   targetLanguage: z.enum(['en', 'it']).optional(),
 });

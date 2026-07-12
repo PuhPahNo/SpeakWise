@@ -25,8 +25,33 @@ function isPublic(pathname: string): boolean {
   return false;
 }
 
+function hasInvalidOrigin(req: NextRequest) {
+  const origin = req.headers.get('origin');
+  if (!origin) return false;
+  try {
+    // Next's request URL may be normalized to `localhost` by the runtime even
+    // when the browser connected through 127.0.0.1 or a reverse proxy. Compare
+    // against the actual request host instead, preferring Render's forwarded
+    // values when present.
+    const forwardedHost = req.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
+    const host = forwardedHost || req.headers.get('host');
+    const forwardedProto = req.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+    const protocol = forwardedProto || req.nextUrl.protocol.replace(':', '');
+    const requestOrigin = host ? `${protocol}://${host}` : req.nextUrl.origin;
+    return new URL(origin).origin !== requestOrigin;
+  } catch {
+    return true;
+  }
+}
+
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+    const fetchSite = req.headers.get('sec-fetch-site');
+    if (fetchSite === 'cross-site' || hasInvalidOrigin(req)) {
+      return NextResponse.json({ error: 'cross_origin_request' }, { status: 403 });
+    }
+  }
   if (isPublic(pathname)) return NextResponse.next();
 
   const hasSession = req.cookies.has(SESSION_COOKIE);

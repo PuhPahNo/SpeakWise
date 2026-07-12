@@ -166,6 +166,7 @@ export default function OnboardingPage() {
   // ElevenLabs). If not, disable voice and start onboarding in chat — the
   // free-tier orb would otherwise hang silently.
   const availCheckedRef = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: guarded one-time capability probe
   useEffect(() => {
     if (availCheckedRef.current) return;
     availCheckedRef.current = true;

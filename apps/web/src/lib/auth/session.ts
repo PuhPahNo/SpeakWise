@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { sealData, unsealData } from 'iron-session';
 import { cookies } from 'next/headers';
 
@@ -9,6 +10,8 @@ export interface SessionData {
   userId: string;
   /** Issued-at timestamp (seconds). Used to detect old sessions. */
   iat: number;
+  /** Changes whenever the user's password or authorization role changes. */
+  fingerprint: string;
 }
 
 function sessionPassword(): string {
@@ -23,8 +26,22 @@ function sessionPassword(): string {
 
 const sealOpts = () => ({ password: sessionPassword(), ttl: SESSION_TTL_SECONDS });
 
-export async function createSession(userId: string): Promise<void> {
-  const data: SessionData = { userId, iat: Math.floor(Date.now() / 1000) };
+export function sessionFingerprint(userId: string, passwordHash: string, role: string): string {
+  return createHmac('sha256', sessionPassword())
+    .update(`${userId}\0${passwordHash}\0${role}`)
+    .digest('base64url');
+}
+
+export async function createSession(
+  userId: string,
+  passwordHash: string,
+  role: string,
+): Promise<void> {
+  const data: SessionData = {
+    userId,
+    iat: Math.floor(Date.now() / 1000),
+    fingerprint: sessionFingerprint(userId, passwordHash, role),
+  };
   const sealed = await sealData(data, sealOpts());
   const jar = await cookies();
   jar.set(SESSION_COOKIE, sealed, {

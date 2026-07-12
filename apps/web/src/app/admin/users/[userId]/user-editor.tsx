@@ -36,6 +36,7 @@ const PERSONALITIES = [
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
+    // biome-ignore lint/a11y/noLabelWithoutControl: the form control is passed as the child
     <label className="block text-sm">
       <span className="mb-1 block text-ink-200">{label}</span>
       {children}

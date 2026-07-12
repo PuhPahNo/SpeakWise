@@ -110,6 +110,7 @@ export function ProfileEditor({ profile }: { profile: Profile }) {
       </Field>
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <button
+          type="button"
           onClick={save}
           disabled={saving}
           className="w-full sm:w-auto rounded-full bg-wise-500 text-ink-900 font-medium px-5 py-3 hover:bg-wise-600 disabled:opacity-50"
@@ -124,6 +125,7 @@ export function ProfileEditor({ profile }: { profile: Profile }) {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
+    // biome-ignore lint/a11y/noLabelWithoutControl: the form control is passed as the child
     <label className="block">
       <div className="text-sm font-medium text-ink-200 mb-1">{label}</div>
       {children}

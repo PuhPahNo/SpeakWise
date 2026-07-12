@@ -23,10 +23,13 @@ describe('auth flow', () => {
   });
 
   it('POST /api/auth/signin with valid creds → 200 + sw_session cookie', async () => {
+    const username = process.env.TEST_USERNAME;
+    const password = process.env.TEST_PASSWORD;
+    if (!username || !password) throw new Error('TEST_USERNAME and TEST_PASSWORD are required');
     const res = await fetch(`${process.env.APP_URL ?? 'http://localhost:3001'}/api/auth/signin`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: 'anthony', password: 'admin123' }),
+      body: JSON.stringify({ username, password }),
     });
     expect(res.status).toBe(200);
     const setCookie = res.headers.get('set-cookie') ?? '';
@@ -38,8 +41,8 @@ describe('auth flow', () => {
       user: { username: string; role: string };
     };
     expect(data.ok).toBe(true);
-    expect(data.user.username).toBe('anthony');
-    expect(data.user.role).toBe('admin');
+    expect(data.user.username).toBe(username);
+    expect(data.user.role).toBe(process.env.TEST_ROLE ?? 'learner');
   });
 
   it('POST /api/auth/signout → 200', async () => {

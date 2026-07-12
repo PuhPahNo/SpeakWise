@@ -148,7 +148,9 @@ async function main() {
     const outputSchema = tpl.outputSchema ? asJson(tpl.outputSchema) : undefined;
     await prisma.promptTemplate.upsert({
       where: { key_version: { key: tpl.key, version: tpl.version } },
-      update: { body: tpl.body, purpose: tpl.purpose, isEnabled: true },
+      // Preserve an operator's explicit disable; deploy-time seed refreshes
+      // content but must not silently re-enable a prompt version.
+      update: { body: tpl.body, purpose: tpl.purpose, inputs: tpl.inputs, outputSchema },
       create: {
         key: tpl.key,
         version: tpl.version,

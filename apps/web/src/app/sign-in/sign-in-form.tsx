@@ -12,6 +12,18 @@ export function SignInForm() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  function safeNextPath(value: string | null): string | null {
+    if (!value || !value.startsWith('/') || value.startsWith('//')) return null;
+    try {
+      const parsed = new URL(value, window.location.origin);
+      return parsed.origin === window.location.origin
+        ? `${parsed.pathname}${parsed.search}${parsed.hash}`
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setPending(true);
@@ -27,7 +39,7 @@ export function SignInForm() {
         // explicit `next` target if they were redirected to sign in).
         const ok = (await res.json().catch(() => ({}))) as { user?: { role?: string } };
         const fallback = ok.user?.role === 'admin' ? '/admin' : '/command-center';
-        router.push(params.get('next') ?? fallback);
+        router.push(safeNextPath(params.get('next')) ?? fallback);
         router.refresh();
         return;
       }

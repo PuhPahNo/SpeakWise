@@ -63,7 +63,6 @@ export function CommandCenter({
   const [summary, setSummary] = useState<SummaryResponse | null>(null);
   const [comeback, setComeback] = useState<ComebackResponse['offer']>(null);
   const [wiseLine, setWiseLine] = useState<string>('');
-  const [userLine, setUserLine] = useState<string>('');
   const [pending, setPending] = useState(false);
   // Running transcript of the spoken conversation (folded in from the old
   // Freestyle/Talk page so Home is the single conversational surface).
@@ -131,7 +130,6 @@ export function CommandCenter({
     // tutor.playOnce() to bypass the gate.
     mode,
     onUserSpeech: async (text) => {
-      setUserLine(text);
       addTurn('user', text);
       await sendToWise(text);
     },
@@ -363,7 +361,6 @@ export function CommandCenter({
     'Quiz me on travel vocabulary',
   ];
   async function askSuggestion(s: string) {
-    setUserLine(s);
     addTurn('user', s);
     try {
       await tutor.primeAudio();

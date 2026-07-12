@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+const optionalString = z.preprocess((v) => (v === '' ? undefined : v), z.string().optional());
+
 export const ServerEnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   APP_URL: z.string().url(),
@@ -11,7 +13,7 @@ export const ServerEnvSchema = z.object({
   AUTH_SESSION_SECRET: z.string().min(32),
 
   OPENAI_API_KEY: z.string().min(1),
-  OPENAI_ORG_ID: z.string().optional(),
+  OPENAI_ORG_ID: optionalString,
   OPENAI_MODEL_FAST: z.string().default('gpt-4o-mini'),
   OPENAI_MODEL_REASONING: z.string().default('gpt-4o'),
   OPENAI_MODEL_EMBEDDING: z.string().default('text-embedding-3-small'),
@@ -20,18 +22,20 @@ export const ServerEnvSchema = z.object({
   ELEVENLABS_API_KEY: z.string().min(1),
   ELEVENLABS_MODEL_ID: z.string().default('eleven_turbo_v2_5'),
 
-  SENTRY_DSN: z.string().url().optional(),
-  POSTHOG_API_KEY: z.string().optional(),
-
   CRON_SECRET: z.string().min(16),
 });
 
 export const PublicEnvSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url(),
-  NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
-  NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
-  NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),
 });
+
+export function validateServerEnv(env: Record<string, string | undefined>): ServerEnv {
+  return ServerEnvSchema.parse(env);
+}
+
+export function validatePublicEnv(env: Record<string, string | undefined>): PublicEnv {
+  return PublicEnvSchema.parse(env);
+}
 
 export type ServerEnv = z.infer<typeof ServerEnvSchema>;
 export type PublicEnv = z.infer<typeof PublicEnvSchema>;

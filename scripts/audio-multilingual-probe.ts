@@ -6,7 +6,7 @@
  * Whisper directly), and asserts both Italian and English content survive.
  *
  * Requires the dev server running on :3001 and a signed-in admin user
- * (TEST_USERNAME / TEST_PASSWORD, defaults anthony / admin123).
+ * (TEST_USERNAME / TEST_PASSWORD are required).
  *
  *   node --experimental-strip-types --env-file=.env scripts/audio-multilingual-probe.ts
  */
@@ -14,8 +14,8 @@ import { writeFileSync } from 'node:fs';
 
 const BASE = process.env.APP_URL ?? 'http://localhost:3001';
 const TEST_USER = {
-  username: process.env.TEST_USERNAME ?? 'anthony',
-  password: process.env.TEST_PASSWORD ?? 'admin123',
+  username: process.env.TEST_USERNAME ?? '',
+  password: process.env.TEST_PASSWORD ?? '',
 };
 
 const PHRASE =
@@ -39,6 +39,9 @@ async function signIn(): Promise<string> {
 }
 
 async function main() {
+  if (!TEST_USER.username || !TEST_USER.password) {
+    throw new Error('TEST_USERNAME and TEST_PASSWORD are required');
+  }
   console.log(`probe: signing in as ${TEST_USER.username}…`);
   const cookie = await signIn();
 

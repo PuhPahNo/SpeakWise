@@ -13,6 +13,7 @@ interface Props {
   label: string;
   /** Optional free-text steer for the generator (e.g. the template summary). */
   userRequest?: string;
+  lessonTemplateSlug?: string;
   className?: string;
 }
 
@@ -28,6 +29,7 @@ export function StartLessonButton({
   durationMinutes,
   label,
   userRequest,
+  lessonTemplateSlug,
   className,
 }: Props) {
   const router = useRouter();
@@ -46,6 +48,7 @@ export function StartLessonButton({
           interestTheme: interestTheme ?? undefined,
           durationMinutes,
           userRequest,
+          lessonTemplateSlug,
         }),
       });
       if (!res.ok) {

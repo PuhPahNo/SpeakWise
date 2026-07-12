@@ -503,6 +503,7 @@ model VocabularyItem {
   incorrectCount      Int         @default(0) @map("incorrect_count")
   lastReviewedAt      DateTime?   @map("last_reviewed_at")
   nextReviewAt        DateTime?   @map("next_review_at")
+  lastReviewToken     String?     @map("last_review_token") @db.Uuid
   createdAt           DateTime    @default(now()) @map("created_at")
   updatedAt           DateTime    @updatedAt @map("updated_at")
 
@@ -610,12 +611,13 @@ model UserResponse {
   corrections Correction[]
 
   @@index([sessionId])
+  @@unique([sessionId, lessonTaskId])
   @@map("user_responses")
 }
 
 model Correction {
   id              String             @id @default(uuid()) @db.Uuid
-  userResponseId  String             @map("user_response_id") @db.Uuid
+  userResponseId  String             @unique @map("user_response_id") @db.Uuid
   correctionType  CorrectionType     @map("correction_type")
   severity        CorrectionSeverity @default(moderate)
   originalText    String             @map("original_text") @db.Text
@@ -637,6 +639,7 @@ model MemoryNote {
   userId            String           @map("user_id") @db.Uuid
   type              MemoryType
   content           String           @db.Text
+  dedupeKey         String           @map("dedupe_key")
   structuredData    Json?            @map("structured_data")
   confidence        Decimal          @default(0.5) @db.Decimal(3, 2)
   visibility        MemoryVisibility @default(internal)
@@ -651,6 +654,7 @@ model MemoryNote {
 
   @@index([userId, type])
   @@index([userId, isActive])
+  @@unique([userId, dedupeKey])
   @@map("memory_notes")
 }
 
@@ -713,6 +717,7 @@ model XpEntry {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+  @@unique([userId, reason, sourceId])
   @@map("xp_entries")
 }
 

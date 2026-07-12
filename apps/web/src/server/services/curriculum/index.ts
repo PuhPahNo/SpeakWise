@@ -161,11 +161,11 @@ export async function materializeUnitVocabularyForUser(userId: string, unitCode:
   if (!unit || unit.vocabulary.length === 0) return { created: 0 };
 
   const existing = await prisma.vocabularyItem.findMany({
-    where: { userId, targetText: { in: unit.vocabulary.map((v) => v.targetText) } },
+    where: { userId },
     select: { targetText: true },
   });
-  const have = new Set(existing.map((e) => e.targetText));
-  const toCreate = unit.vocabulary.filter((v) => !have.has(v.targetText));
+  const have = new Set(existing.map((e) => e.targetText.trim().toLowerCase()));
+  const toCreate = unit.vocabulary.filter((v) => !have.has(v.targetText.trim().toLowerCase()));
   if (toCreate.length === 0) return { created: 0 };
 
   await prisma.vocabularyItem.createMany({
@@ -179,6 +179,7 @@ export async function materializeUnitVocabularyForUser(userId: string, unitCode:
       // status defaults to `new`; tag with the chapter + sub-theme for filtering
       tags: [unit.code, ...(v.theme ? [v.theme] : [])],
     })),
+    skipDuplicates: true,
   });
   return { created: toCreate.length };
 }
